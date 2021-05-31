@@ -52,16 +52,15 @@ import org.apache.commons.lang.ArrayUtils;
 public class Sox_10_Tools {
    
     // min volume in µm^3 for cells
-    public double minCell = 20;
+    public double minCell = 200;
     // max volume in µm^3 for cells
-    public double maxCell = 5000;
+    public double maxCell = 3000;
     // Dog parameters
-    private double radius = 2;
     private Calibration cal = new Calibration(); 
     
 
     // dots threshold method
-    private String thMet = "Otsu";
+    private String thMet = "Moments";
     
     public CLIJ2 clij2 = CLIJ2.getInstance();
     
@@ -353,8 +352,8 @@ public class Sox_10_Tools {
      */
     public Objects3DPopulation findCellsDoG(ImagePlus img) {
         ClearCLBuffer imgCL = clij2.push(img);
-        double sig1 = radius/(3*img.getCalibration().pixelWidth);
-        double sig2 = radius/img.getCalibration().pixelWidth;
+        double sig1 = 2;
+        double sig2 = 4;
         ClearCLBuffer imgCLDOG = DOG(imgCL, sig1, sig2);
         clij2.release(imgCL);
         ImagePlus imgBin = clij2.pull(threshold(imgCLDOG, thMet, false));
@@ -399,7 +398,7 @@ public class Sox_10_Tools {
         // define spatial descriptor, model
         SpatialDescriptor spatialDesc = new F_Function(pop.getNbObjects(), mask);
         pop.setMask(mask);
-        SpatialModel spatialModel = new SpatialRandomHardCore(pop.getNbObjects(), 0.8, mask);
+        SpatialModel spatialModel = new SpatialRandomHardCore(pop.getNbObjects(),   1, mask);
         SpatialStatistics spatialStatistics = new SpatialStatistics(spatialDesc, spatialModel, 50, pop);
         spatialStatistics.setEnvelope(0.25);
         spatialStatistics.setVerbose(false);

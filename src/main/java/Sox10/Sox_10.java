@@ -110,7 +110,7 @@ public class Sox_10 implements PlugIn {
             // Write headers results for results file{
             FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
             outPutResults = new BufferedWriter(fileResults);
-            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Nuclei\tNuclei mean intensity\tNuclei sd intensity\tNuclei mean volume\t Nuclei sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor\tDistributionAleatoireStat \n");
+            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\tCell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor\tDistributionAleatoireStat \n");
             outPutResults.flush();
                     
                 
@@ -137,21 +137,18 @@ public class Sox_10 implements PlugIn {
                 }
                 // define roi as all image
                 else {
-                    rois.add(new Roi(0, 0, width, height));
+                    //rois.add(new Roi(0, 0, width, height));
+                    IJ.log("No ROIs found ! byebye \n");
+                    return;
                 }
                 
-                 ImporterOptions options = new ImporterOptions();
+                ImporterOptions options = new ImporterOptions();
                 options.setId(f);
                 options.setStitchTiles(true);
                 options.setOpenAllSeries(true);
-                // error when crop on import
-                //options.setCrop(true);
-                //options.setCropRegion(0, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
-
+               
                 // open Cell channel, for all series
                 int nseries = reader.getSeriesCount();
-                //System.out.println(nseries);
-                
                 for (int s=0; s<nseries;s++) {
                 options.setCBegin(s, channelIndex[1]);
                 options.setCEnd(s, channelIndex[1]);      
