@@ -51,11 +51,10 @@ import org.apache.commons.lang.ArrayUtils;
  */
 public class Sox_10_Tools {
    
-
     // min volume in µm^3 for cells
-    public double minCell = 0.02;
+    public double minCell = 20;
     // max volume in µm^3 for cells
-    public double maxCell = 60;
+    public double maxCell = 5000;
     // Dog parameters
     private double radius = 2;
     private Calibration cal = new Calibration(); 
@@ -379,7 +378,6 @@ public class Sox_10_Tools {
 
      */
     public void saveCellsImage(Objects3DPopulation cellPop, ImagePlus img, String pathName) {
-
         ImageHandler imh = ImageHandler.wrap(img);
         cellPop.draw(imh, 255);
 
@@ -432,27 +430,25 @@ public class Sox_10_Tools {
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
         DescriptiveStatistics cellVolume = new DescriptiveStatistics();
-        double minDistCenterMean = Double.NaN;
-        double minDistCenterSD = Double.NaN;
-        double sdiF = Double.NaN;
+        double cellVolumeSum = 0.0;
         for (int i = 0; i < cellPop.getNbObjects(); i++) {
             Object3D cellObj = cellPop.getObject(i);
             cellIntensity.addValue(cellObj.getIntegratedDensity(ImageHandler.wrap(imgCell)));
             cellVolume.addValue(cellObj.getVolumeUnit());
+            cellVolumeSum += cellObj.getVolumeUnit();
         }
-        sdiF = processF(cellPop, imgCell, outDirResults, imgName, roiName);
+        double sdiF = processF(cellPop, imgCell, outDirResults, imgName, roiName);
 
-        minDistCenterMean = cellPop.distancesAllClosestCenter().getMean(); 
-        minDistCenterSD = cellPop.distancesAllClosestCenter().getStdDev();
+        double minDistCenterMean = cellPop.distancesAllClosestCenter().getMean(); 
+        double minDistCenterSD = cellPop.distancesAllClosestCenter().getStdDev();
         // compute statistics
         double cellIntMean = cellIntensity.getMean();
         double cellIntSD = cellIntensity.getStandardDeviation();
-        double cellVolumeMean = cellVolume.getMean();
+        double cellVolumeMean = cellVolumeSum/cellPop.getNbObjects();
         double cellVolumeSD = cellVolume.getStandardDeviation();
-        double cellVolumeSum = cellVolume.getSum();
         double roiVol = imgCell.getWidth()*imgCell.getHeight()*imgCell.getNSlices()*imgCell.getCalibration().pixelDepth;  
-        results.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+
-                cellVolumeSD+"\t"+cellVolumeSum+"\t"+sdiF+"\n");
+        results.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+"\t"+
+                cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+sdiF+"\n");
         
         results.flush();
     }

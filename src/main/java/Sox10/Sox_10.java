@@ -110,7 +110,7 @@ public class Sox_10 implements PlugIn {
             // Write headers results for results file{
             FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
             outPutResults = new BufferedWriter(fileResults);
-            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Nuclei\tCell mean intensity\n");
+            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Nuclei\tNuclei mean intensity\tNuclei sd intensity\tNuclei mean volume\t Nuclei sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor\tDistributionAleatoireStat \n");
             outPutResults.flush();
                     
                 
@@ -175,12 +175,12 @@ public class Sox_10 implements PlugIn {
                     ImagePlus imgCells = new Duplicator().run(wholeImage);
                     Objects3DPopulation cellPop = sox.findCellsDoG(imgCells);
                     System.out.println(cellPop.getNbObjects()+" cells found");
-                    sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
-                    
                     // find parameters
                     sox.computeNucParameters(cellPop, imgCells, roi.getName(), rootName, outDirResults, outPutResults);
+                    sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
                     sox.closeImages(imgCells);
                 }
+                sox.closeImages(wholeImage);
             }
             outPutResults.close();
             IJ.showStatus("Processing done....");
