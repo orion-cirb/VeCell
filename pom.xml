@@ -46,7 +46,8 @@
 	</scm>
 
 	<properties>
-            <imagej.app.directory>/opt/Fiji.app/</imagej.app.directory>
+            <!--<imagej.app.directory>/opt/Fiji.app/</imagej.app.directory> -->
+                <imagej.app.directory>/home/gaelle/Logiciel/Fiji.app/</imagej.app.directory>
             <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
             <main-class>Sox_10.jar</main-class>
 	</properties>
@@ -114,19 +115,8 @@
 	  <artifactId>ij-tools</artifactId>
 	  <version>2.0.0-SNAPSHOT</version>
 	  <type>jar</type>
-	 </dependency>
-	 <dependency>
-	  <groupId>sc.fiji</groupId>
-	  <artifactId>CorrectBleach_</artifactId>
-	  <version>2.0.3-SNAPSHOT</version>
-	  <type>jar</type>
-	 </dependency>
-	 <dependency>
-	  <groupId>sc.fiji</groupId>
-	  <artifactId>LocalThickness_</artifactId>
-	  <version>4.0.3-SNAPSHOT</version>
-	  <type>jar</type>
-	 </dependency>
+         </dependency>
+	 
 	 <dependency>
 	  <groupId>net.imagej</groupId>
 	  <artifactId>imagej-ops</artifactId>

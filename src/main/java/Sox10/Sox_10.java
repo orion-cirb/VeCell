@@ -6,8 +6,10 @@ package Sox10;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
+import ij.gui.WaitForUserDialog;
 import ij.plugin.frame.RoiManager;
 import ij.measure.Calibration;
+import ij.plugin.Duplicator;
 import ij.plugin.PlugIn;
 import java.awt.Rectangle;
 import java.io.BufferedWriter;
@@ -104,6 +106,14 @@ public class Sox_10 implements PlugIn {
             cal = sox.getCalib();
             if (channelIndex == null)
                 return;
+            
+            // Write headers results for results file{
+            FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
+            outPutResults = new BufferedWriter(fileResults);
+            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Nuclei\tCell mean intensity\n");
+            outPutResults.flush();
+                    
+                
             for (String f : imageFiles) {
                 String rootName = FilenameUtils.getBaseName(f);
                 reader.setId(f);
@@ -130,31 +140,39 @@ public class Sox_10 implements PlugIn {
                     rois.add(new Roi(0, 0, width, height));
                 }
                 
+                 ImporterOptions options = new ImporterOptions();
+                options.setId(f);
+                options.setStitchTiles(true);
+                options.setOpenAllSeries(true);
+                // error when crop on import
+                //options.setCrop(true);
+                //options.setCropRegion(0, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
+
+                // open Cell channel, for all series
+                int nseries = reader.getSeriesCount();
+                //System.out.println(nseries);
+                
+                for (int s=0; s<nseries;s++) {
+                options.setCBegin(s, channelIndex[1]);
+                options.setCEnd(s, channelIndex[1]);      
+                }
+                options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
+                options.setQuiet(true);
+                ImagePlus[] allImages = BF.openImagePlus(options);
+                // get the stitched image
+                ImagePlus wholeImage = allImages[allImages.length-1];
+                // close the other images
+                for (int k=0; k<(allImages.length-1); k++){
+                    sox.closeImages(allImages[k]);
+                }
+                
                 // For each roi open cropped image
                 for (Roi roi : rois) {
                     nucIndex++;
                     
-                    // Write headers results for results file{
-                    FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
-                    outPutResults = new BufferedWriter(fileResults);
-                    outPutResults.write("Image name\tRoi name\tRoi volume\tNb Nuclei\tCell mean intensity\n");
-                    outPutResults.flush();
-                    
                     Rectangle rectRoi = roi.getBounds();
-                    ImporterOptions options = new ImporterOptions();
-                    options.setId(f);
-                    options.setStitchTiles(true);
-                    options.setOpenAllSeries(true);
-                    options.setCrop(true);
-                    options.setCropRegion(0, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
-                    
-                    // open Cell channel
-                    
-                    options.setCBegin(0, channelIndex[1]);
-                    options.setCEnd(0, channelIndex[1]);
-                    options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-                    options.setQuiet(true);
-                    ImagePlus imgCells = BF.openImagePlus(options)[0]; 
+                    wholeImage.setRoi(rectRoi);
+                    ImagePlus imgCells = new Duplicator().run(wholeImage);
                     Objects3DPopulation cellPop = sox.findCellsDoG(imgCells);
                     System.out.println(cellPop.getNbObjects()+" cells found");
                     sox.saveCellsImage(cellPop, imgCells, rootName+"_"+roi.getName()+".tif");
