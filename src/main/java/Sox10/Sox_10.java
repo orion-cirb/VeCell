@@ -172,9 +172,10 @@ public class Sox_10 implements PlugIn {
                     ImagePlus imgCells = new Duplicator().run(wholeImage);
                     Objects3DPopulation cellPop = sox.findCellsDoG(imgCells);
                     System.out.println(cellPop.getNbObjects()+" cells found");
+                    sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
+                                        
                     // find parameters
                     sox.computeNucParameters(cellPop, imgCells, roi.getName(), rootName, outDirResults, outPutResults);
-                    sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
                     sox.closeImages(imgCells);
                 }
                 sox.closeImages(wholeImage);

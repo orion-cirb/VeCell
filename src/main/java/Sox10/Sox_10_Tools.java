@@ -8,6 +8,8 @@ import ij.gui.Plot;
 import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
+import ij.plugin.Duplicator;
+import ij.process.ImageProcessor;
 import java.awt.Color;
 import java.awt.Font;
 import java.io.BufferedWriter;
@@ -30,6 +32,7 @@ import loci.plugins.util.ImageProcessorReader;
 import static mcib3d.geom.Object3D_IJUtils.createObject3DVoxels;
 import mcib3d.spatial.analysis.SpatialStatistics;
 import mcib3d.spatial.descriptors.F_Function;
+import mcib3d.spatial.descriptors.G_Function;
 import mcib3d.spatial.descriptors.SpatialDescriptor;
 import mcib3d.spatial.sampler.SpatialModel;
 import mcib3d.spatial.sampler.SpatialRandomHardCore;
@@ -385,7 +388,37 @@ public class Sox_10_Tools {
         imgCells.saveAsTiff(pathName);
         imh.closeImagePlus();
     }
+    
+    /** \brief bounding box of the population*/
+     protected void maskBounding(Objects3DPopulation pop, ImagePlus empty) {
+        int[] res = {Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0};
         
+        for (Object3D obj : pop.getObjectsList()) {
+            int[] bb = obj.getBoundingBox();
+            for ( int mi=0; mi<6; mi+=2)
+            {
+                if (res[mi] > bb[mi]) res[mi]= bb[mi];
+            } 
+            for ( int ma=1; ma<6; ma+=2)
+            {
+                if (res[ma] < bb[ma]) res[ma]= bb[ma];
+            }
+        }
+        for (int z=res[4]; z<=res[5]; z++)
+         {
+                empty.setSlice(z);
+                ImageProcessor proc = empty.getProcessor();
+                for (int x=res[0]; x<=res[1]; x++)
+                {
+                    for (int y=res[2]; y<=res[3]; y++)
+                    {
+                        proc.putPixel(x,y,255);
+                    }
+                }
+                empty.updateAndDraw();
+            }
+       }
+    
     /**
     * For compute F function
      * @param pop
@@ -393,18 +426,31 @@ public class Sox_10_Tools {
      * @return F SDI
     **/ 
     public double processF (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName) {
-        Object3D mask = createObject3DVoxels(imgCells, 0);
+        
+        // change to convex hull ?
+        ImagePlus imgMask = new Duplicator().run(imgCells);
+        IJ.run(imgMask, "Select All", "");
+        IJ.run(imgMask, "Clear", "stack");
+        IJ.run(imgMask, "Select None", "");
+        maskBounding(pop, imgMask);
+        //imgMask.show();
+        //new WaitForUserDialog("test").show();
+        Object3D mask = createObject3DVoxels(imgMask, 255);
         
         // define spatial descriptor, model
-        SpatialDescriptor spatialDesc = new F_Function(pop.getNbObjects(), mask);
+        //SpatialDescriptor spatialDesc = new F_Function(pop.getNbObjects(), mask);
+        SpatialDescriptor spatialDesc = new G_Function();
+        
         pop.setMask(mask);
-        SpatialModel spatialModel = new SpatialRandomHardCore(pop.getNbObjects(),   1, mask);
+        double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
+        //System.out.println(minDist);
+        SpatialModel spatialModel = new SpatialRandomHardCore(pop.getNbObjects(), minDist, mask);  
         SpatialStatistics spatialStatistics = new SpatialStatistics(spatialDesc, spatialModel, 50, pop);
         spatialStatistics.setEnvelope(0.25);
         spatialStatistics.setVerbose(false);
         Plot fPlot = spatialStatistics.getPlot();
         fPlot.draw();
-        fPlot.addLabel(0.1, 0.1, "p = " + String.valueOf(spatialStatistics.getSdi()));
+        fPlot.addLabel(0.1, 0.1, "sdi = " + String.valueOf(spatialStatistics.getSdi()));
         ImagePlus imgPlot = fPlot.getImagePlus();
         FileSaver plotSave = new FileSaver(imgPlot);
         plotSave.saveAsTiff(outDirResults + imgName + "_Fplot_" + roiName + ".tif");
