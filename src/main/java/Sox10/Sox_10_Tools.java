@@ -459,7 +459,7 @@ public class Sox_10_Tools {
         Object3D mask = createObject3DVoxels(imgMask, 255);
         
         String outname = outDirResults + imgName + "_Fplot_" + roiName + ".tif";
-       double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
+        double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
         return processG(pop, mask, 50, minDist, outname);
   
     }
@@ -634,12 +634,13 @@ public class Sox_10_Tools {
      * @return
      */
     private double getVolumeObjInside(ImagePlus img, Object3D obj) {
-        double  x= obj.getCenterX();
-        double  y= obj.getCenterY();
+        double x = obj.getCenterX();
+        double y = obj.getCenterY();
         double z = obj.getCenterZ();
         ObjectCreator3D creat = new ObjectCreator3D(img.getImageStack());
-        creat.createSphereUnit(x, y, z, radiusNei, (float) 255, false);
-        Object3DVoxels sphere = creat.getObject3DVoxels(255);
+        //creat.createSphereUnit(x, y, z, radiusNei, (float) 255, false);
+        Object3DVoxels sphere = new Object3DVoxels();
+        sphere.createSphereUnit((float)x, (float)y, (float)z, (float)radiusNei);
         // check if object go outside image
         if (sphere.getXmin() < 0 || sphere.getXmax() > img.getWidth() || sphere.getYmin() < 0 || sphere.getYmax() > img.getHeight()
                 || sphere.getZmin() < 0 || sphere.getZmax() > img.getNSlices()) {
@@ -674,6 +675,7 @@ public class Sox_10_Tools {
         DescriptiveStatistics cellNbNeighbors = new DescriptiveStatistics();
         double cellVolumeSum = 0.0;
         // do individual stats
+        cellPop.createKDTreeCenters();
         for (int i = 0; i < cellPop.getNbObjects(); i++) {
             Object3D cellObj = cellPop.getObject(i);
             cellIntensity.addValue(cellObj.getIntegratedDensity(ImageHandler.wrap(imgCell)));
