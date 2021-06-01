@@ -110,58 +110,42 @@ public class Sox_10 implements PlugIn {
             // Write headers results for results file{
             FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
             outPutResults = new BufferedWriter(fileResults);
-            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\tCell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor\tDistributionAleatoireStat \n");
+            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
+                    + "Cell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor"
+                    + "Density neighbors Mean\t Density neighbors SD\tDistributionAleatoireStat \n");
             outPutResults.flush();
                     
                 
             for (String f : imageFiles) {
                 String rootName = FilenameUtils.getBaseName(f);
                 reader.setId(f);
-                int series = reader.getSeries();
-                int width = meta.getPixelsSizeX(series).getValue();
-                int height = meta.getPixelsSizeY(series).getValue();
-                reader.setSeries(series);
-                boolean roiFile = true;
                 // Test if ROI file exist
                 String roi_file  = (new File(imageDir+rootName+".zip").exists()) ? imageDir+rootName+".zip" :  ((new File(imageDir+rootName+".roi").exists()) ? imageDir+rootName+".roi" : null);
                 if (roi_file == null) {
                     IJ.showStatus("No ROI file found !") ;
-                    roiFile = false;
-                }
-                List<Roi> rois = new ArrayList<>();
-                if (roiFile) {
-                    // find rois
-                    RoiManager rm = new RoiManager(false);
-                    rm.runCommand("Open", roi_file);
-                    rois = Arrays.asList(rm.getRoisAsArray());
-                }
-                // define roi as all image
-                else {
-                    //rois.add(new Roi(0, 0, width, height));
                     IJ.log("No ROIs found ! byebye \n");
                     return;
                 }
+                List<Roi> rois = new ArrayList<>();
+                    // find rois
+                RoiManager rm = new RoiManager(false);
+                rm.runCommand("Open", roi_file);
+                rois = Arrays.asList(rm.getRoisAsArray());
                 
                 ImporterOptions options = new ImporterOptions();
                 options.setId(f);
-                options.setStitchTiles(true);
-                options.setOpenAllSeries(true);
+                options.setStitchTiles(false);
+                options.setOpenAllSeries(false);
                
                 // open Cell channel, for all series
                 int nseries = reader.getSeriesCount();
-                for (int s=0; s<nseries;s++) {
-                options.setCBegin(s, channelIndex[1]);
-                options.setCEnd(s, channelIndex[1]);      
-                }
+                options.setCBegin(nseries-1, channelIndex[1]);
+                options.setCEnd(nseries-1, channelIndex[1]); 
+                options.setSeriesOn(nseries-1, true);
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                 options.setQuiet(true);
-                ImagePlus[] allImages = BF.openImagePlus(options);
-                // get the stitched image
-                ImagePlus wholeImage = allImages[allImages.length-1];
-                // close the other images
-                for (int k=0; k<(allImages.length-1); k++){
-                    sox.closeImages(allImages[k]);
-                }
+                //reader.setSeries(nseries);
+                ImagePlus wholeImage = BF.openImagePlus(options)[0];
                 
                 // For each roi open cropped image
                 for (Roi roi : rois) {
@@ -179,6 +163,7 @@ public class Sox_10 implements PlugIn {
                     sox.closeImages(imgCells);
                 }
                 sox.closeImages(wholeImage);
+                options.setSeriesOn(nseries-1, false);
             }
             outPutResults.close();
             IJ.showStatus("Processing done....");

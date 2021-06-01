@@ -5,10 +5,12 @@ import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Plot;
+import ij.gui.PlotWindow;
 import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.Duplicator;
+import ij.process.AutoThresholder;
 import ij.process.ImageProcessor;
 import java.awt.Color;
 import java.awt.Font;
@@ -17,6 +19,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.ImageIcon;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
@@ -29,13 +34,18 @@ import mcib3d.image3d.ImageLabeller;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import loci.formats.meta.IMetadata;
 import loci.plugins.util.ImageProcessorReader;
+import mcib3d.geom.Object3DVoxels;
 import static mcib3d.geom.Object3D_IJUtils.createObject3DVoxels;
+import mcib3d.geom.ObjectCreator3D;
 import mcib3d.spatial.analysis.SpatialStatistics;
 import mcib3d.spatial.descriptors.F_Function;
 import mcib3d.spatial.descriptors.G_Function;
 import mcib3d.spatial.descriptors.SpatialDescriptor;
 import mcib3d.spatial.sampler.SpatialModel;
 import mcib3d.spatial.sampler.SpatialRandomHardCore;
+import mcib3d.utils.ArrayUtil;
+import mcib3d.utils.CDFTools;
+import mcib3d.utils.ThreadUtil;
 import net.haesleinhuepf.clij.clearcl.ClearCLBuffer;
 import net.haesleinhuepf.clij2.CLIJ2;
 import org.apache.commons.io.FilenameUtils;
@@ -58,8 +68,14 @@ public class Sox_10_Tools {
     public double minCell = 200;
     // max volume in µm^3 for cells
     public double maxCell = 3000;
+    // sigmas for DoG
+    private double sigma1 = 4;
+    private double sigma2 = 2;
     // Dog parameters
     private Calibration cal = new Calibration(); 
+    
+    private boolean doF = false;
+    private double radiusNei = 50; //neighboring radius
     
 
     // dots threshold method
@@ -324,13 +340,21 @@ public class Sox_10_Tools {
             gd.addChoice(chNames[index]+" : ", channels, channels[index]);
             index++;
         }
+        String[] methods = AutoThresholder.getMethods();
         gd.addMessage("Cells parameters", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Min cell size (µm3) : ", minCell, 3);
         gd.addNumericField("Max cell size (µm3) : ", maxCell, 3);
+        gd.addChoice("Thresholding method :", methods, thMet);
+        gd.addMessage("Difference of Gaussian", Font.getFont("Monospace"), Color.blue);
+        gd.addNumericField("radius 1 (pixels) : ", sigma1, 1);
+        gd.addNumericField("radius 2 (pixels) : ", sigma2, 1);
         gd.addMessage("Image calibration", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Calibration xy (µm)  :", cal.pixelWidth, 3);
         if ( cal.pixelDepth == 1) cal.pixelDepth = 0.5;
         gd.addNumericField("Calibration z (µm)  :", cal.pixelDepth, 3);
+        gd.addMessage("Spatial distribution", Font.getFont("Monospace"), Color.blue);
+        gd.addNumericField("Radius for neighboring analysis", radiusNei, 2);
+        gd.addCheckbox("Do comparaison to random distribution", false);
         gd.showDialog();
         int[] chChoices = new int[channels.length];
         for (int n = 0; n < chChoices.length; n++) {
@@ -338,9 +362,14 @@ public class Sox_10_Tools {
         }
         minCell = gd.getNextNumber();
         maxCell = gd.getNextNumber();
+        thMet = gd.getNextChoice();
+        sigma1 = gd.getNextNumber();
+        sigma2 = gd.getNextNumber();
         cal.pixelWidth = gd.getNextNumber();
         cal.pixelHeight = cal.pixelWidth;
         cal.pixelDepth = gd.getNextNumber();
+        radiusNei = gd.getNextNumber();
+        doF = gd.getNextBoolean();
         if (gd.wasCanceled())
                 chChoices = null;
         return(chChoices);
@@ -391,21 +420,10 @@ public class Sox_10_Tools {
     
     /** \brief bounding box of the population*/
      protected void maskBounding(Objects3DPopulation pop, ImagePlus empty) {
-        int[] res = {Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0};
-        
-        for (Object3D obj : pop.getObjectsList()) {
-            int[] bb = obj.getBoundingBox();
-            for ( int mi=0; mi<6; mi+=2)
-            {
-                if (res[mi] > bb[mi]) res[mi]= bb[mi];
-            } 
-            for ( int ma=1; ma<6; ma+=2)
-            {
-                if (res[ma] < bb[ma]) res[ma]= bb[ma];
-            }
-        }
+        Object3D box = pop.getMask();
+        int[] res = box.getBoundingBox();
         for (int z=res[4]; z<=res[5]; z++)
-         {
+        {
                 empty.setSlice(z);
                 ImageProcessor proc = empty.getProcessor();
                 for (int x=res[0]; x<=res[1]; x++)
@@ -421,11 +439,14 @@ public class Sox_10_Tools {
     
     /**
     * For compute F function
+    * 
+    * To parallelize !
+    * 
      * @param pop
      * @param mask
      * @return F SDI
     **/ 
-    public double processF (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName) {
+    public double processGParallel (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName) {
         
         // change to convex hull ?
         ImagePlus imgMask = new Duplicator().run(imgCells);
@@ -437,29 +458,204 @@ public class Sox_10_Tools {
         //new WaitForUserDialog("test").show();
         Object3D mask = createObject3DVoxels(imgMask, 255);
         
-        // define spatial descriptor, model
-        //SpatialDescriptor spatialDesc = new F_Function(pop.getNbObjects(), mask);
-        SpatialDescriptor spatialDesc = new G_Function();
-        
-        pop.setMask(mask);
-        double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
-        //System.out.println(minDist);
-        SpatialModel spatialModel = new SpatialRandomHardCore(pop.getNbObjects(), minDist, mask);  
-        SpatialStatistics spatialStatistics = new SpatialStatistics(spatialDesc, spatialModel, 50, pop);
-        spatialStatistics.setEnvelope(0.25);
-        spatialStatistics.setVerbose(false);
-        Plot fPlot = spatialStatistics.getPlot();
-        fPlot.draw();
-        fPlot.addLabel(0.1, 0.1, "sdi = " + String.valueOf(spatialStatistics.getSdi()));
-        ImagePlus imgPlot = fPlot.getImagePlus();
-        FileSaver plotSave = new FileSaver(imgPlot);
-        plotSave.saveAsTiff(outDirResults + imgName + "_Fplot_" + roiName + ".tif");
-        closeImages(imgPlot);
-        System.out.println("Sdi = " + spatialStatistics.getSdi());
-        return(spatialStatistics.getSdi());
+        String outname = outDirResults + imgName + "_Fplot_" + roiName + ".tif";
+       double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
+        return processG(pop, mask, 50, minDist, outname);
+  
     }
     
+    private double processG(Objects3DPopulation pop, Object3D mask, final int numRandomSamples, final double distHardCore, String filename) {
+        //final Calibration calibration = Object3D_IJUtils.getCalibration(mask);
+        final double sxy = mask.getResXY();
+        final double sz = mask.getResZ();
+        final String unit = mask.getUnits();
+        //final Calibration calibration = mask.getCalibration();
+        final int nbSpots = pop.getNbObjects();
+
+        // observed G
+        ArrayUtil observedDistancesG;
+        ArrayUtil observedCDG;
+        observedDistancesG = pop.distancesAllClosestCenter();
+        observedDistancesG.sort();
+        observedCDG = CDFTools.cdf(observedDistancesG);
+
+        // Average G
+        ArrayUtil xEvalG;
+        final ArrayUtil[] sampleDistancesG;
+        ArrayUtil averageCDG;
+
+        xEvalG = new ArrayUtil(numRandomSamples * nbSpots);
+        sampleDistancesG = new ArrayUtil[numRandomSamples];
+
+        // PARALLEL
+        final Object3D mask2 = mask;
+        final AtomicInteger ai = new AtomicInteger(0);
+        final int nCpu = ThreadUtil.getNbCpus();
+        Thread[] threads = ThreadUtil.createThreadArray(nCpu);
+        final int dec = (int) Math.ceil((double) numRandomSamples / (double) nCpu);
+        for (int iThread = 0; iThread < threads.length; iThread++) {
+            threads[iThread] = new Thread() {
+                @Override
+                public void run() {
+                    ArrayUtil distances2;
+                    //image.setShowStatus(show);
+                    for (int k = ai.getAndIncrement(); k < nCpu; k = ai.getAndIncrement()) {
+                        for (int i = dec * k; ((i < (dec * (k + 1))) && (i < numRandomSamples)); i++) {
+                            Objects3DPopulation popRandom = new Objects3DPopulation();
+                            //popRandom.setCalibration(calibration);
+                            popRandom.setCalibration(sxy, sz, unit);
+                            popRandom.setMask(mask2);
+                            popRandom.createRandomPopulation(nbSpots, distHardCore);
+                            distances2 = popRandom.distancesAllClosestCenter();
+                            distances2.sort();
+                            sampleDistancesG[i] = distances2;
+                        }
+                    }
+                }
+            };
+        }
+        ThreadUtil.startAndJoin(threads);
+        for (int i = 0; i < numRandomSamples; i++) {
+            xEvalG.insertValues(i * nbSpots, sampleDistancesG[i]);
+        }
+        xEvalG.sort();
+        averageCDG = CDFTools.cdfAverage(sampleDistancesG, xEvalG);
+
+        // Envelope G
+        ai.set(0);
+        for (int iThread = 0; iThread < threads.length; iThread++) {
+            threads[iThread] = new Thread() {
+                @Override
+                public void run() {
+                    ArrayUtil distances2;
+                    //image.setShowStatus(show);
+                    for (int k = ai.getAndIncrement(); k < nCpu; k = ai.getAndIncrement()) {
+                        for (int i = dec * k; ((i < (dec * (k + 1))) && (i < numRandomSamples)); i++) {
+                            
+                            Objects3DPopulation popRandom = new Objects3DPopulation();
+                            //popRandom.setCalibration(calibration);
+                            popRandom.setCalibration(sxy, sz, unit);
+                            popRandom.setMask(mask2);
+                            popRandom.createRandomPopulation(nbSpots, distHardCore);
+                            distances2 = popRandom.distancesAllClosestCenter();
+                            distances2.sort();
+                            sampleDistancesG[i] = distances2;
+                        }
+                    }
+                }
+            };
+        }
+        ThreadUtil.startAndJoin(threads);
+
+        double sdi_G = CDFTools.SDI(observedDistancesG, sampleDistancesG, averageCDG, xEvalG);
+        IJ.log("SDI G=" + sdi_G);
+        // plot
+        Plot plotG = null;
+        plotG = createPlot(xEvalG, sampleDistancesG, observedDistancesG, observedCDG, averageCDG, "G");
+        plotG.draw();
+        
+        plotG.addLabel(0.1, 0.1, "sdi = " + String.valueOf(sdi_G));
+        ImagePlus imgPlot = plotG.getImagePlus();
+        FileSaver plotSave = new FileSaver(imgPlot);
+        plotSave.saveAsTiff(filename);
+        closeImages(imgPlot);
+
+        return sdi_G;
+    }
+
+     private Plot createPlot(ArrayUtil xEvals, ArrayUtil[] sampleDistances, ArrayUtil observedDistances, ArrayUtil observedCD, ArrayUtil averageCD, String function) {
+        Color ColorAVG = Color.red;
+        Color ColorENV = Color.green;
+        Color ColorOBS = Color.blue;
+        int nbBins = 1000;
+        double env = 0.25;
+        double plotMaxX = observedDistances.getMaximum();
+        double plotMaxY = observedCD.getMaximum();
+
+        // low env
+        double max = xEvals.getMaximum();
+        ArrayUtil xEval0 = new ArrayUtil(nbBins);
+        for (int i = 0; i < nbBins; i++) {
+            xEval0.addValue(i, ((double) i) * max / ((double) nbBins));
+        }
+        // get the values
+        ArrayUtil samplesPc5 = CDFTools.cdfPercentage(sampleDistances, xEval0, env / 2.0);
+        ArrayUtil samplesPc95 = CDFTools.cdfPercentage(sampleDistances, xEval0, 1.0 - env / 2.0);
+        // get the limits
+        if (xEval0.getMaximum() > plotMaxX) {
+            plotMaxX = xEval0.getMaximum();
+        }
+        if (samplesPc5.getMaximum() > plotMaxY) {
+            plotMaxY = samplesPc5.getMaximum();
+        }
+        if (samplesPc95.getMaximum() > plotMaxY) {
+            plotMaxY = samplesPc95.getMaximum();
+        }
+        if (xEvals.getMaximum() > plotMaxX) {
+            plotMaxX = xEvals.getMaximum();
+        }
+        if (averageCD.getMaximum() > plotMaxY) {
+            plotMaxY = averageCD.getMaximum();
+        }
+        if (observedCD.getMaximum() > plotMaxY) {
+            plotMaxY = observedCD.getMaximum();
+        }
+        if (observedDistances.getMaximum() > plotMaxX) {
+            plotMaxX = observedDistances.getMaximum();
+        }
+        // create the plot
+        Plot plot = new Plot(function + "-function", "distance", "cumulated frequency");
+        plot.setLimits(0, plotMaxX, 0, plotMaxY);
+
+        // envelope  for e.g 10 % at 5 and 95 %
+        plot.setColor(ColorENV);
+        plot.addPoints(xEval0.getArray(), samplesPc5.getArray(), Plot.LINE);
+
+        // envelope  for e.g 10 % at 5 and 95 %
+        plot.setColor(ColorENV);
+        plot.addPoints(xEval0.getArray(), samplesPc95.getArray(), Plot.LINE);
+
+        // average
+        plot.setColor(ColorAVG);
+        plot.addPoints(xEvals.getArray(), averageCD.getArray(), Plot.LINE);
+
+        // observed
+        plot.setColor(ColorOBS);
+        plot.addPoints(observedDistances.getArray(), observedCD.getArray(), Plot.LINE);
+
+        return plot;
+    }
+
     
+    /**
+     * Return dilated object restriced to image borders
+     * @param img
+     * @param obj
+     * @return
+     */
+    private double getVolumeObjInside(ImagePlus img, Object3D obj) {
+        double  x= obj.getCenterX();
+        double  y= obj.getCenterY();
+        double z = obj.getCenterZ();
+        ObjectCreator3D creat = new ObjectCreator3D(img.getImageStack());
+        creat.createSphereUnit(x, y, z, radiusNei, (float) 255, false);
+        Object3DVoxels sphere = creat.getObject3DVoxels(255);
+        // check if object go outside image
+        if (sphere.getXmin() < 0 || sphere.getXmax() > img.getWidth() || sphere.getYmin() < 0 || sphere.getYmax() > img.getHeight()
+                || sphere.getZmin() < 0 || sphere.getZmax() > img.getNSlices()) {
+            Object3DVoxels voxObj = new Object3DVoxels(sphere.listVoxels(ImageHandler.wrap(img)));
+            return(voxObj.getVolumeUnit());
+        }
+        else
+            return(sphere.getVolumeUnit());
+    }
+    
+    public double getNbNeighbors(Object3D obj, Objects3DPopulation pop, ImagePlus img) {
+        double vol = getVolumeObjInside(img, obj);
+        ArrayList<Object3D> objs = pop.getObjectsWithinDistanceCenter(obj, radiusNei);
+        int nobj = objs.size();
+        return nobj/vol;
+    }
     
     /**
     * Compute global cells parameters
@@ -475,15 +671,19 @@ public class Sox_10_Tools {
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
         DescriptiveStatistics cellVolume = new DescriptiveStatistics();
+        DescriptiveStatistics cellNbNeighbors = new DescriptiveStatistics();
         double cellVolumeSum = 0.0;
+        // do individual stats
         for (int i = 0; i < cellPop.getNbObjects(); i++) {
             Object3D cellObj = cellPop.getObject(i);
             cellIntensity.addValue(cellObj.getIntegratedDensity(ImageHandler.wrap(imgCell)));
             cellVolume.addValue(cellObj.getVolumeUnit());
             cellVolumeSum += cellObj.getVolumeUnit();
+            cellNbNeighbors.addValue( getNbNeighbors(cellObj, cellPop, imgCell) );
         }
-        double sdiF = processF(cellPop, imgCell, outDirResults, imgName, roiName);
-
+        double sdiF = Double.NaN;
+        if (doF) sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName);
+        
         double minDistCenterMean = cellPop.distancesAllClosestCenter().getMean(); 
         double minDistCenterSD = cellPop.distancesAllClosestCenter().getStdDev();
         // compute statistics
@@ -491,9 +691,12 @@ public class Sox_10_Tools {
         double cellIntSD = cellIntensity.getStandardDeviation();
         double cellVolumeMean = cellVolumeSum/cellPop.getNbObjects();
         double cellVolumeSD = cellVolume.getStandardDeviation();
-        double roiVol = imgCell.getWidth()*imgCell.getHeight()*imgCell.getNSlices()*imgCell.getCalibration().pixelDepth;  
+        double roiVol = imgCell.getWidth()*imgCell.getHeight()*imgCell.getNSlices()*imgCell.getCalibration().pixelDepth;
+        double neiMean = cellNbNeighbors.getMean();
+        double neiSD = cellNbNeighbors.getStandardDeviation();
+        
         results.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+"\t"+
-                cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+sdiF+"\n");
+                cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+neiMean+"\t"+neiSD+"\t"+sdiF+"\n");
         
         results.flush();
     }
