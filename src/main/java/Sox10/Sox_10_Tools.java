@@ -420,22 +420,25 @@ public class Sox_10_Tools {
     
     /** \brief bounding box of the population*/
      protected void maskBounding(Objects3DPopulation pop, ImagePlus empty) {
+        empty.show();
+        new WaitForUserDialog(thMet).show();
         Object3D box = pop.getMask();
+        box.draw(ImageHandler.wrap(empty), 255);
         int[] res = box.getBoundingBox();
         for (int z=res[4]; z<=res[5]; z++)
         {
-                empty.setSlice(z);
-                ImageProcessor proc = empty.getProcessor();
-                for (int x=res[0]; x<=res[1]; x++)
+            empty.setSlice(z);
+            ImageProcessor proc = empty.getProcessor();
+            for (int x=res[0]; x<=res[1]; x++)
+            {
+                for (int y=res[2]; y<=res[3]; y++)
                 {
-                    for (int y=res[2]; y<=res[3]; y++)
-                    {
-                        proc.putPixel(x,y,255);
-                    }
+                    proc.putPixel(x,y,255);
                 }
-                empty.updateAndDraw();
             }
+            empty.updateAndDraw();
        }
+    }
     
     /**
     * For compute F function
@@ -450,9 +453,9 @@ public class Sox_10_Tools {
         
         // change to convex hull ?
         ImagePlus imgMask = new Duplicator().run(imgCells);
-        IJ.run(imgMask, "Select All", "");
-        IJ.run(imgMask, "Clear", "stack");
-        IJ.run(imgMask, "Select None", "");
+//        IJ.run(imgMask, "Select All", "");
+//        IJ.run(imgMask, "Clear", "stack");
+//        IJ.run(imgMask, "Select None", "");
         maskBounding(pop, imgMask);
         //imgMask.show();
         //new WaitForUserDialog("test").show();
@@ -651,10 +654,10 @@ public class Sox_10_Tools {
     }
     
     public double getNbNeighbors(Object3D obj, Objects3DPopulation pop, ImagePlus img) {
-        double vol = getVolumeObjInside(img, obj);
+        //double vol = getVolumeObjInside(img, obj);
         ArrayList<Object3D> objs = pop.getObjectsWithinDistanceCenter(obj, radiusNei);
         int nobj = objs.size();
-        return nobj/vol;
+        return nobj;
     }
     
     /**
@@ -667,14 +670,15 @@ public class Sox_10_Tools {
     **/
     public void computeNucParameters(Objects3DPopulation cellPop, ImagePlus imgCell, String roiName,
             String imgName, String outDirResults, BufferedWriter results) throws IOException {
-        IJ.showStatus("Computing cells parameters ....");
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
         DescriptiveStatistics cellVolume = new DescriptiveStatistics();
         DescriptiveStatistics cellNbNeighbors = new DescriptiveStatistics();
         double cellVolumeSum = 0.0;
         // do individual stats
+        cellPop.createKDTreeCenters();
         for (int i = 0; i < cellPop.getNbObjects(); i++) {
+            IJ.showStatus("Computing cell "+(i+1)+" parameters ....");
             Object3D cellObj = cellPop.getObject(i);
             cellIntensity.addValue(cellObj.getIntegratedDensity(ImageHandler.wrap(imgCell)));
             cellVolume.addValue(cellObj.getVolumeUnit());
@@ -682,7 +686,10 @@ public class Sox_10_Tools {
             cellNbNeighbors.addValue( getNbNeighbors(cellObj, cellPop, imgCell) );
         }
         double sdiF = Double.NaN;
-        if (doF) sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName);
+        if (doF) {
+            IJ.showStatus("Computing spatial distribution G Function ...");
+            sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName);
+        }
         
         double minDistCenterMean = cellPop.distancesAllClosestCenter().getMean(); 
         double minDistCenterSD = cellPop.distancesAllClosestCenter().getStdDev();
