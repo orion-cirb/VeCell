@@ -640,8 +640,6 @@ public class Sox_10_Tools {
         double x = obj.getCenterX();
         double y = obj.getCenterY();
         double z = obj.getCenterZ();
-        ObjectCreator3D creat = new ObjectCreator3D(img.getImageStack());
-        //creat.createSphereUnit(x, y, z, radiusNei, (float) 255, false);
         Object3DVoxels sphere = new Object3DVoxels();
         sphere.createSphereUnit((float)x, (float)y, (float)z, (float)radiusNei);
         // check if object go outside image
@@ -655,10 +653,10 @@ public class Sox_10_Tools {
     }
     
     public double getNbNeighbors(Object3D obj, Objects3DPopulation pop, ImagePlus img) {
-        //double vol = getVolumeObjInside(img, obj);
+        double vol = getVolumeObjInside(img, obj);
         ArrayList<Object3D> objs = pop.getObjectsWithinDistanceCenter(obj, radiusNei);
         int nobj = objs.size();
-        return nobj;
+        return nobj/vol;
     }
     
     /**
@@ -670,7 +668,7 @@ public class Sox_10_Tools {
      * @param results buffer
     **/
     public void computeNucParameters(Objects3DPopulation cellPop, ImagePlus imgCell, String roiName,
-            String imgName, String outDirResults, BufferedWriter results) throws IOException {
+          String imgName, String outDirResults, BufferedWriter results) throws IOException {
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
         DescriptiveStatistics cellVolume = new DescriptiveStatistics();
