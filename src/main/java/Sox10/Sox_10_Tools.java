@@ -420,11 +420,19 @@ public class Sox_10_Tools {
     
     /** \brief bounding box of the population*/
      protected void maskBounding(Objects3DPopulation pop, ImagePlus empty) {
-        empty.show();
-        new WaitForUserDialog(thMet).show();
-        Object3D box = pop.getMask();
-        box.draw(ImageHandler.wrap(empty), 255);
-        int[] res = box.getBoundingBox();
+         int[] res = {Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0};
+        
+        for (Object3D obj : pop.getObjectsList()) {
+            int[] bb = obj.getBoundingBox();
+            for ( int mi=0; mi<6; mi+=2)
+            {
+                if (res[mi] > bb[mi]) res[mi]= bb[mi];
+            } 
+            for ( int ma=1; ma<6; ma+=2)
+            {
+                if (res[ma] < bb[ma]) res[ma]= bb[ma];
+            }
+        }
         for (int z=res[4]; z<=res[5]; z++)
         {
             empty.setSlice(z);
@@ -441,27 +449,26 @@ public class Sox_10_Tools {
     }
     
     /**
-    * For compute F function
+    * For compute G function, with parallel version
     * 
-    * To parallelize !
     * 
      * @param pop
      * @param mask
-     * @return F SDI
+     * @return G SDI
     **/ 
     public double processGParallel (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName) {
         
         // change to convex hull ?
         ImagePlus imgMask = new Duplicator().run(imgCells);
-//        IJ.run(imgMask, "Select All", "");
-//        IJ.run(imgMask, "Clear", "stack");
-//        IJ.run(imgMask, "Select None", "");
+        IJ.run(imgMask, "Select All", "");
+        IJ.run(imgMask, "Clear", "stack");
+        IJ.run(imgMask, "Select None", "");
         maskBounding(pop, imgMask);
         //imgMask.show();
         //new WaitForUserDialog("test").show();
         Object3D mask = createObject3DVoxels(imgMask, 255);
-        
-        String outname = outDirResults + imgName + "_Fplot_" + roiName + ".tif";
+        closeImages(imgMask);
+        String outname = outDirResults + imgName + "_Gplot_" + roiName + ".tif";
         double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
         return processG(pop, mask, 50, minDist, outname);
   
