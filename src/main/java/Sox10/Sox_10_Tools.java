@@ -260,9 +260,11 @@ public class Sox_10_Tools {
      */ 
     public ClearCLBuffer DOG(ClearCLBuffer imgCL, double size1, double size2) {
         ClearCLBuffer imgCLDOG = clij2.create(imgCL);
-        clij2.differenceOfGaussian3D(imgCL, imgCLDOG, size1, size1, size1, size2, size2, size2);
+        ClearCLBuffer imgCLDOGmed = median_filter(imgCLDOG, 2, 2);
+        clij2.release(imgCLDOG);
+        clij2.differenceOfGaussian3D(imgCL, imgCLDOGmed, size1, size1, size1, size2, size2, size2);
         clij2.release(imgCL);
-        return(imgCLDOG);
+        return(imgCLDOGmed);
     }
     
     /**
@@ -384,9 +386,9 @@ public class Sox_10_Tools {
      */
     public Objects3DPopulation findCellsDoG(ImagePlus img) {
         ClearCLBuffer imgCL = clij2.push(img);
-        double sig1 = 2;
-        double sig2 = 4;
-        ClearCLBuffer imgCLDOG = DOG(imgCL, sig1, sig2);
+        //double sig1 = 2;
+        //double sig2 = 4;
+        ClearCLBuffer imgCLDOG = DOG(imgCL, sigma2, sigma1);
         clij2.release(imgCL);
         ImagePlus imgBin = clij2.pull(threshold(imgCLDOG, thMet, false));
         clij2.release(imgCLDOG);
