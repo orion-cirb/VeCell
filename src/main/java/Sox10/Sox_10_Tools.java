@@ -4,6 +4,7 @@ package Sox10;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.Prefs;
 import ij.gui.Plot;
 import ij.gui.PlotWindow;
 import ij.gui.Roi;
@@ -70,8 +71,8 @@ public class Sox_10_Tools {
     // max volume in µm^3 for cells
     public double maxCell = 3000;
     // sigmas for DoG
-    private double sigma1 = 4;
-    private double sigma2 = 2;
+    private double sigma1 = 2;
+    private double sigma2 = 4;
     // Dog parameters
     private Calibration cal = new Calibration(); 
     
@@ -300,6 +301,7 @@ public class Sox_10_Tools {
         return(imgCLBin);
     }
     
+    
     /**
      * Find image type
      */
@@ -378,7 +380,6 @@ public class Sox_10_Tools {
         return(chChoices);
     }
     
-
     
     /** 
      * Find cells with DOG method
@@ -386,23 +387,21 @@ public class Sox_10_Tools {
      * @return cells population
      */
     public Objects3DPopulation findCellsDoG(ImagePlus img, Roi roi) {
+        IJ.run(img, "Subtract Background...", "rolling=10 stack");
         ClearCLBuffer imgCL = clij2.push(img);
-        //double sig1 = 2;
-        //double sig2 = 4;
-        ClearCLBuffer imgCLDOG = DOG(imgCL, sigma2, sigma1);
+        ClearCLBuffer imgCLDOG = DOG(imgCL, sigma1, sigma2);
         clij2.release(imgCL);
-        ImagePlus imgBin = clij2.pull(threshold(imgCLDOG, thMet, false));
+        ClearCLBuffer imgCLBin = threshold(imgCLDOG, thMet, false); 
         clij2.release(imgCLDOG);
+        ImagePlus imgBin = clij2.pull(imgCLBin);
+        clij2.release(imgCLBin);
         imgBin.setRoi(roi);
         roi.setLocation(0, 0);
         IJ.setBackgroundColor(0, 0, 0);
         IJ.run(imgBin, "Clear Outside", "stack");
         imgBin.setCalibration(img.getCalibration());
-        //imgBin.show();
-        //new WaitForUserDialog("test").show();
         Objects3DPopulation pmlPop = new Objects3DPopulation(getPopFromImage(imgBin).getObjectsWithinVolume(minCell, maxCell, true));
         closeImages(imgBin);
-      
         return(pmlPop);
     } 
     
