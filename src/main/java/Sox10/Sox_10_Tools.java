@@ -691,7 +691,8 @@ public class Sox_10_Tools {
         cellPop.createKDTreeCenters();
         ArrayUtil alldistances = cellPop.distancesAllClosestCenter();
         for (int i = 0; i < cellPop.getNbObjects(); i++) {
-            IJ.showStatus("Computing cell "+(i+1)+" parameters ....");
+            IJ.showStatus("Computing cell "+i+" parameters ....");
+            IJ.showProgress(i, cellPop.getNbObjects());
             Object3D cellObj = cellPop.getObject(i);
             cellIntensity.addValue(cellObj.getIntegratedDensity(ImageHandler.wrap(imgCell)));
             cellVolume.addValue(cellObj.getVolumeUnit());
