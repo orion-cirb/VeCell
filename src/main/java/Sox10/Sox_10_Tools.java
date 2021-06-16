@@ -6,6 +6,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Plot;
 import ij.gui.PlotWindow;
+import ij.gui.Roi;
 import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
@@ -384,7 +385,7 @@ public class Sox_10_Tools {
      * @param img channel
      * @return cells population
      */
-    public Objects3DPopulation findCellsDoG(ImagePlus img) {
+    public Objects3DPopulation findCellsDoG(ImagePlus img, Roi roi) {
         ClearCLBuffer imgCL = clij2.push(img);
         //double sig1 = 2;
         //double sig2 = 4;
@@ -392,6 +393,10 @@ public class Sox_10_Tools {
         clij2.release(imgCL);
         ImagePlus imgBin = clij2.pull(threshold(imgCLDOG, thMet, false));
         clij2.release(imgCLDOG);
+        imgBin.setRoi(roi);
+        roi.setLocation(0, 0);
+        IJ.setBackgroundColor(0, 0, 0);
+        IJ.run(imgBin, "Clear Outside", "stack");
         imgBin.setCalibration(img.getCalibration());
         //imgBin.show();
         //new WaitForUserDialog("test").show();
@@ -677,7 +682,7 @@ public class Sox_10_Tools {
      * @param results buffer
     **/
     public void computeNucParameters(Objects3DPopulation cellPop, ImagePlus imgCell, String roiName,
-          String imgName, String outDirResults, BufferedWriter results) throws IOException {
+          String imgName, String outDirResults, BufferedWriter results, BufferedWriter distances) throws IOException {
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
         DescriptiveStatistics cellVolume = new DescriptiveStatistics();
@@ -685,6 +690,7 @@ public class Sox_10_Tools {
         double cellVolumeSum = 0.0;
         // do individual stats
         cellPop.createKDTreeCenters();
+        ArrayUtil alldistances = cellPop.distancesAllClosestCenter();
         for (int i = 0; i < cellPop.getNbObjects(); i++) {
             IJ.showStatus("Computing cell "+(i+1)+" parameters ....");
             Object3D cellObj = cellPop.getObject(i);
@@ -692,15 +698,18 @@ public class Sox_10_Tools {
             cellVolume.addValue(cellObj.getVolumeUnit());
             cellVolumeSum += cellObj.getVolumeUnit();
             cellNbNeighbors.addValue( getNbNeighbors(cellObj, cellPop, imgCell) );
+            distances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\n");
         }
+        distances.flush();
         double sdiF = Double.NaN;
         if (doF) {
             IJ.showStatus("Computing spatial distribution G Function ...");
             sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName);
         }
         
-        double minDistCenterMean = cellPop.distancesAllClosestCenter().getMean(); 
-        double minDistCenterSD = cellPop.distancesAllClosestCenter().getStdDev();
+        
+        double minDistCenterMean = alldistances.getMean(); 
+        double minDistCenterSD = alldistances.getStdDev();
         // compute statistics
         double cellIntMean = cellIntensity.getMean();
         double cellIntSD = cellIntensity.getStandardDeviation();

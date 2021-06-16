@@ -49,6 +49,7 @@ public class Sox_10 implements PlugIn {
     private String imageDir;
     private static String outDirResults;
     private BufferedWriter outPutResults;
+      private BufferedWriter outPutDistances;
     public static Calibration cal = new Calibration();
     // min and max cells filter volume
     private final double minCells = 10;
@@ -112,9 +113,15 @@ public class Sox_10 implements PlugIn {
             outPutResults = new BufferedWriter(fileResults);
             outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
                     + "Cell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor"
-                    + "Density neighbors Mean\t Density neighbors SD\tDistributionAleatoireStat \n");
+                    + "\t Density neighbors Mean\t Density neighbors SD\tDistributionAleatoireStat \n");
             outPutResults.flush();
-                    
+            
+            // Write headers results for results file{
+            FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
+            outPutDistances = new BufferedWriter(fileDistances);
+            outPutDistances.write("Image name\tRoi name\tCellVolume\tDistanceToClosestNeighbor \n");
+            outPutDistances.flush();
+            
                 
             for (String f : imageFiles) {
                 String rootName = FilenameUtils.getBaseName(f);
@@ -151,15 +158,15 @@ public class Sox_10 implements PlugIn {
                 for (Roi roi : rois) {
                     nucIndex++;
                     
-                    Rectangle rectRoi = roi.getBounds();
-                    wholeImage.setRoi(rectRoi);
+                    wholeImage.setRoi(roi);
                     ImagePlus imgCells = new Duplicator().run(wholeImage);
-                    Objects3DPopulation cellPop = sox.findCellsDoG(imgCells);
+                 
+                    Objects3DPopulation cellPop = sox.findCellsDoG(imgCells, roi);
                     System.out.println(cellPop.getNbObjects()+" cells found");
                     sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
                                         
                     // find parameters
-                    sox.computeNucParameters(cellPop, imgCells, roi.getName(), rootName, outDirResults, outPutResults);
+                    sox.computeNucParameters(cellPop, imgCells, roi.getName(), rootName, outDirResults, outPutResults, outPutDistances);
                     sox.closeImages(imgCells);
                 }
                 sox.closeImages(wholeImage);
