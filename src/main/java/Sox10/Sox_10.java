@@ -151,15 +151,17 @@ public class Sox_10 implements PlugIn {
                 options.setSeriesOn(nseries-1, true);
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                 options.setQuiet(true);
+                options.setCrop(true);
+                
                 //reader.setSeries(nseries);
                 ImagePlus wholeImage = BF.openImagePlus(options)[0];
                 
                 // For each roi open cropped image
                 for (Roi roi : rois) {
                     nucIndex++;
-                    
-                    wholeImage.setRoi(roi);
-                    ImagePlus imgCells = new Duplicator().run(wholeImage);
+                    Rectangle rectRoi = roi.getBounds();
+                    options.setCropRegion(nseries-1, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
+                    ImagePlus imgCells = BF.openImagePlus(options)[0];
                  
                     Objects3DPopulation cellPop = sox.findCellsDoG(imgCells, roi);
                     System.out.println(cellPop.getNbObjects()+" cells found");
