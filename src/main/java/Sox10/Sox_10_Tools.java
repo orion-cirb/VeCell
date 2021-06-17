@@ -387,7 +387,7 @@ public class Sox_10_Tools {
      * @return cells population
      */
     public Objects3DPopulation findCellsDoG(ImagePlus img, Roi roi) {
-        IJ.run(img, "Subtract Background...", "rolling=10 stack");
+        IJ.run(img, "Subtract Background...", "rolling=50 stack");
         ClearCLBuffer imgCL = clij2.push(img);
         ClearCLBuffer imgCLDOG = DOG(imgCL, sigma1, sigma2);
         clij2.release(imgCL);
