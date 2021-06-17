@@ -208,7 +208,6 @@ public class Sox_10_Tools {
         else
             cal.pixelDepth = 1;
         cal.setUnit("microns");
-        System.out.println("x cal = " +cal.pixelWidth+", z cal=" + cal.pixelDepth);
         return(cal);
     }
     
@@ -350,7 +349,7 @@ public class Sox_10_Tools {
         gd.addNumericField("Min cell size (µm3) : ", minCell, 3);
         gd.addNumericField("Max cell size (µm3) : ", maxCell, 3);
         gd.addChoice("Thresholding method :", methods, thMet);
-        gd.addMessage("Difference of Gaussian", Font.getFont("Monospace"), Color.blue);
+        gd.addMessage("Difference of Gaussian (radius1 < radius2)", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("radius 1 (pixels) : ", sigma1, 1);
         gd.addNumericField("radius 2 (pixels) : ", sigma2, 1);
         gd.addMessage("Image calibration", Font.getFont("Monospace"), Color.blue);
