@@ -425,33 +425,25 @@ public class Sox_10_Tools {
     }
     
     /** \brief bounding box of the population*/
-     protected void maskBounding(Objects3DPopulation pop, ImagePlus empty) {
+     protected void maskBounding(Objects3DPopulation pop, ImagePlus empty, Roi roi) {
          int[] res = {Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0};
         
+         // get min, max z
         for (Object3D obj : pop.getObjectsList()) {
             int[] bb = obj.getBoundingBox();
-            for ( int mi=0; mi<6; mi+=2)
-            {
-                if (res[mi] > bb[mi]) res[mi]= bb[mi];
-            } 
-            for ( int ma=1; ma<6; ma+=2)
-            {
-                if (res[ma] < bb[ma]) res[ma]= bb[ma];
-            }
+            if (res[4] > bb[4]) res[4]= bb[4];
+            if (res[5] < bb[5]) res[5]= bb[5];
         }
+        
         for (int z=res[4]; z<=res[5]; z++)
         {
             empty.setSlice(z);
             ImageProcessor proc = empty.getProcessor();
-            for (int x=res[0]; x<=res[1]; x++)
-            {
-                for (int y=res[2]; y<=res[3]; y++)
-                {
-                    proc.putPixel(x,y,255);
-                }
-            }
-            empty.updateAndDraw();
+            empty.setRoi(roi);
+            IJ.setForegroundColor(255,255,255);
+            IJ.run(empty, "Fill", "slice");
        }
+       IJ.run(empty, "Select None", "");
     }
     
     /**
@@ -462,14 +454,14 @@ public class Sox_10_Tools {
      * @param mask
      * @return G SDI
     **/ 
-    public double processGParallel (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName) {
+    public double processGParallel (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName, Roi roi) {
         
         // change to convex hull ?
         ImagePlus imgMask = new Duplicator().run(imgCells);
         IJ.run(imgMask, "Select All", "");
         IJ.run(imgMask, "Clear", "stack");
         IJ.run(imgMask, "Select None", "");
-        maskBounding(pop, imgMask);
+        maskBounding(pop, imgMask, roi);
         //imgMask.show();
         //new WaitForUserDialog("test").show();
         Object3D mask = createObject3DVoxels(imgMask, 255);
@@ -680,7 +672,7 @@ public class Sox_10_Tools {
     * @param outDirResults results file
      * @param results buffer
     **/
-    public void computeNucParameters(Objects3DPopulation cellPop, ImagePlus imgCell, String roiName,
+    public void computeNucParameters(Objects3DPopulation cellPop, ImagePlus imgCell, String roiName, Roi roi,
           String imgName, String outDirResults, BufferedWriter results, BufferedWriter distances) throws IOException {
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
@@ -704,7 +696,7 @@ public class Sox_10_Tools {
         double sdiF = Double.NaN;
         if (doF) {
             IJ.showStatus("Computing spatial distribution G Function ...");
-            sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName);
+            sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName, roi);
         }
         
         

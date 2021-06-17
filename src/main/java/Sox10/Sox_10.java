@@ -168,7 +168,7 @@ public class Sox_10 implements PlugIn {
                     sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
                                         
                     // find parameters
-                    sox.computeNucParameters(cellPop, imgCells, roi.getName(), rootName, outDirResults, outPutResults, outPutDistances);
+                    sox.computeNucParameters(cellPop, imgCells, roi.getName(), roi, rootName, outDirResults, outPutResults, outPutDistances);
                     sox.closeImages(imgCells);
                 }
                 sox.closeImages(wholeImage);
