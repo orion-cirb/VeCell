@@ -71,6 +71,7 @@ public class Sox_10_Tools {
         
     private BufferedWriter outPutResults;
     private BufferedWriter outPutDistances;
+    //private BufferedWriter outPlot; 
     
 
     // dots threshold method
@@ -326,19 +327,25 @@ public class Sox_10_Tools {
      * @param outDirResults
     */
     public void writeHeaders(String outDirResults) throws IOException {
+        // global results
         FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
         outPutResults = new BufferedWriter(fileResults);
         outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
                 + "Cell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor"
                 + "\tMeanOfAverageDistance of "+nbNei+" neighbors"+"\tSDOfAverageDistance of "+nbNei+" neighbors"+"\tMeanOfMaxDistance of "+nbNei+" neighbors"+
-                "\tSDOfMaxDistance of "+nbNei+" neighbors"+"\tDistributionAleatoireStat \n");
+                "\tSDOfMaxDistance of "+nbNei+" neighbors\tAreaCurves\tDistributionAleatoireStat \n");
         outPutResults.flush();
 
-        // Write headers results for results file{
+        // distances results
         FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
         outPutDistances = new BufferedWriter(fileDistances);
         outPutDistances.write("Image name\tRoi name\tCellVolume\tDistanceToClosestNeighbor \n");
         outPutDistances.flush();
+        // G plot results 
+        //FileWriter filePlot = new FileWriter(outDirResults +"Plot.xls", false);
+        //outPutPlot = new BufferedWriter(filePlot);
+        //outPutPlot.write("Image name\tRoi name\tx observed\ty observed\tx random\ty random\n");
+        //outPutPlot.flush();
     }
     
     /**
@@ -469,7 +476,7 @@ public class Sox_10_Tools {
      * @param mask
      * @return G SDI
     **/ 
-    public double processGParallel (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName, Roi roi) {
+    public double[] processGParallel (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName, Roi roi) {
         
         // change to convex hull ?
         ImagePlus imgMask = new Duplicator().run(imgCells);
@@ -477,17 +484,15 @@ public class Sox_10_Tools {
         IJ.run(imgMask, "Clear", "stack");
         IJ.run(imgMask, "Select None", "");
         maskBounding(pop, imgMask, roi);
-        //imgMask.show();
-        //new WaitForUserDialog("test").show();
         Object3D mask = createObject3DVoxels(imgMask, 255);
         closeImages(imgMask);
         String outname = outDirResults + imgName + "_Gplot_" + roiName + ".tif";
         double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
-        return processG(pop, mask, 50, minDist, outname);
+        return processG(pop, mask, 50, minDist, outname, roiName);
   
     }
     
-    private double processG(Objects3DPopulation pop, Object3D mask, final int numRandomSamples, final double distHardCore, String filename) {
+    private double[] processG(Objects3DPopulation pop, Object3D mask, final int numRandomSamples, final double distHardCore, String filename, String roiName) {
         //final Calibration calibration = Object3D_IJUtils.getCalibration(mask);
         final double sxy = mask.getResXY();
         final double sz = mask.getResZ();
@@ -571,19 +576,31 @@ public class Sox_10_Tools {
         ThreadUtil.startAndJoin(threads);
 
         double sdi_G = CDFTools.SDI(observedDistancesG, sampleDistancesG, averageCDG, xEvalG);
-        IJ.log("SDI G=" + sdi_G);
+        double area = integrate(observedDistancesG,observedCDG)-integrate(xEvalG,averageCDG)+(xEvalG.getMaximum() - observedDistancesG.getMaximum());
+
         // plot
         Plot plotG = null;
         plotG = createPlot(xEvalG, sampleDistancesG, observedDistancesG, observedCDG, averageCDG, "G");
         plotG.draw();
         
-        plotG.addLabel(0.1, 0.1, "sdi = " + String.valueOf(sdi_G));
+        plotG.addLabel(0.1, 0.1, "sdi = " + String.format("%.2f",sdi_G));
+        plotG.addLabel(0.1, 0.15, "Area diff. = " + String.format("%.3f",area));
         ImagePlus imgPlot = plotG.getImagePlus();
         FileSaver plotSave = new FileSaver(imgPlot);
         plotSave.saveAsTiff(filename);
-        closeImages(imgPlot);
-
-        return sdi_G;
+        closeImages(imgPlot); 
+        //showPlotData(roiName, filename,observedDistancesG,observedCDG,xEvalG,averageCDG, plotResults);
+        double[] res = {sdi_G, area}; 
+        return res;
+    }
+    
+    public void showPlotData(String roiName,String imgName,ArrayUtil xObs, ArrayUtil yObs, ArrayUtil xRand, ArrayUtil yRand,BufferedWriter plotResults) 
+            throws IOException{
+        ArrayUtil a = (xObs.size()>xRand.size()) ? xObs : xRand;
+        for (int i=0; i<a.size(); i++){          
+            plotResults.write(imgName+"\t"+roiName+"\t"+xObs.getValue(i)+"\t"+yObs.getValue(i)+"\t"+xRand.getValue(i)+"\t"+yRand.getValue(i)+"\n");
+            plotResults.flush();
+        }
     }
 
      private Plot createPlot(ArrayUtil xEvals, ArrayUtil[] sampleDistances, ArrayUtil observedDistances, ArrayUtil observedCD, ArrayUtil averageCD, String function) {
@@ -662,6 +679,21 @@ public class Sox_10_Tools {
     }
     
     /**
+     * 
+     * @param x
+     * @param y
+     * @return 
+     */
+    private double integrate (ArrayUtil x, ArrayUtil y){
+        double sum = 0.0;
+        for(int i=0; i<x.size()-1; i++){
+            sum += (x.getValue(i+1)-x.getValue(i))*y.getValue(i);
+            sum += (x.getValue(i+1)-x.getValue(i))*(y.getValue(i+1)-y.getValue(i))/2.0;
+        }
+        return sum;
+    }
+    
+    /**
     * Compute global cells parameters
     * @param cellPop cell population
     * @param imgCell read cell intensity
@@ -694,9 +726,12 @@ public class Sox_10_Tools {
         }
         outPutDistances.flush();
         double sdiF = Double.NaN;
+        double areaCurves = Double.NaN;
         if (doF) {
             IJ.showStatus("Computing spatial distribution G Function ...");
-            sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName, roi);
+            double[] temp = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName, roi);
+            sdiF = temp[0];
+            areaCurves = temp[1];
         }
        
         double minDistCenterMean = alldistances.getMean(); 
@@ -713,7 +748,8 @@ public class Sox_10_Tools {
         double neiMaxSD = cellNbNeighborsDistMax.getStandardDeviation();
         
         outPutResults.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+"\t"+
-                cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+neiMeanMean+"\t"+neiMeanSD+"\t"+neiMaxMean+"\t"+neiMaxSD+"\t"+sdiF+"\n");
+                cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+neiMeanMean+"\t"+neiMeanSD+"\t"+neiMaxMean+"\t"+neiMaxSD
+                +"\t"+areaCurves+"\t"+sdiF+"\n");
         
         outPutResults.flush();
     }
@@ -722,6 +758,6 @@ public class Sox_10_Tools {
     public void closeResults() throws IOException {
        outPutResults.close();
        outPutDistances.close();         
-
+       //outPutPlot.close();
     }
 }
