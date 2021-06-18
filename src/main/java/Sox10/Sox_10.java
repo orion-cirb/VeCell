@@ -48,8 +48,6 @@ public class Sox_10 implements PlugIn {
     private boolean canceled;
     private String imageDir;
     private static String outDirResults;
-    private BufferedWriter outPutResults;
-      private BufferedWriter outPutDistances;
     public static Calibration cal = new Calibration();
     // min and max cells filter volume
     private final double minCells = 10;
@@ -108,19 +106,8 @@ public class Sox_10 implements PlugIn {
             if (channelIndex == null)
                 return;
             
-            // Write headers results for results file{
-            FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
-            outPutResults = new BufferedWriter(fileResults);
-            outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
-                    + "Cell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor"
-                    + "\t Density neighbors Mean\t Density neighbors SD\tDistributionAleatoireStat \n");
-            outPutResults.flush();
-            
-            // Write headers results for results file{
-            FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
-            outPutDistances = new BufferedWriter(fileDistances);
-            outPutDistances.write("Image name\tRoi name\tCellVolume\tDistanceToClosestNeighbor \n");
-            outPutDistances.flush();
+            // write headers for results tables
+            sox.writeHeaders(outDirResults);
             
                 
             for (String f : imageFiles) {
@@ -168,13 +155,13 @@ public class Sox_10 implements PlugIn {
                     sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
                                         
                     // find parameters
-                    sox.computeNucParameters(cellPop, imgCells, roi.getName(), roi, rootName, outDirResults, outPutResults, outPutDistances);
+                    sox.computeNucParameters(cellPop, imgCells, roi.getName(), roi, rootName, outDirResults);
                     sox.closeImages(imgCells);
                 }
                 sox.closeImages(wholeImage);
                 options.setSeriesOn(nseries-1, false);
             }
-            outPutResults.close();
+            sox.closeResults();
             IJ.showStatus("Processing done....");
         } catch (DependencyException | ServiceException | IOException | FormatException ex) {
             Logger.getLogger(Sox_10.class.getName()).log(Level.SEVERE, null, ex);

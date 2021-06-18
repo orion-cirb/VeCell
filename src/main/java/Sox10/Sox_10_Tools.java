@@ -4,11 +4,8 @@ package Sox10;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
-import ij.Prefs;
 import ij.gui.Plot;
-import ij.gui.PlotWindow;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.Duplicator;
@@ -18,12 +15,11 @@ import java.awt.Color;
 import java.awt.Font;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.swing.ImageIcon;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
@@ -38,13 +34,6 @@ import loci.formats.meta.IMetadata;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom.Object3DVoxels;
 import static mcib3d.geom.Object3D_IJUtils.createObject3DVoxels;
-import mcib3d.geom.ObjectCreator3D;
-import mcib3d.spatial.analysis.SpatialStatistics;
-import mcib3d.spatial.descriptors.F_Function;
-import mcib3d.spatial.descriptors.G_Function;
-import mcib3d.spatial.descriptors.SpatialDescriptor;
-import mcib3d.spatial.sampler.SpatialModel;
-import mcib3d.spatial.sampler.SpatialRandomHardCore;
 import mcib3d.utils.ArrayUtil;
 import mcib3d.utils.CDFTools;
 import mcib3d.utils.ThreadUtil;
@@ -78,6 +67,10 @@ public class Sox_10_Tools {
     
     private boolean doF = false;
     private double radiusNei = 50; //neighboring radius
+    private int nbNei = 10; // K neighborg
+        
+    private BufferedWriter outPutResults;
+    private BufferedWriter outPutDistances;
     
 
     // dots threshold method
@@ -328,6 +321,27 @@ public class Sox_10_Tools {
     
     
     /**
+     * Write headers for results file
+     * 
+     * @param outDirResults
+    */
+    public void writeHeaders(String outDirResults) throws IOException {
+        FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
+        outPutResults = new BufferedWriter(fileResults);
+        outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
+                + "Cell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor"
+                + "\tMeanOfAverageDistance of "+nbNei+" neighbors"+"\tSDOfAverageDistance of "+nbNei+" neighbors"+"\tMeanOfMaxDistance of "+nbNei+" neighbors"+
+                "\tSDOfMaxDistance of "+nbNei+" neighbors"+"\tDistributionAleatoireStat \n");
+        outPutResults.flush();
+
+        // Write headers results for results file{
+        FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
+        outPutDistances = new BufferedWriter(fileDistances);
+        outPutDistances.write("Image name\tRoi name\tCellVolume\tDistanceToClosestNeighbor \n");
+        outPutDistances.flush();
+    }
+    
+    /**
      * Dialog 
      * 
      * @param channels
@@ -357,7 +371,8 @@ public class Sox_10_Tools {
         if ( cal.pixelDepth == 1) cal.pixelDepth = 0.5;
         gd.addNumericField("Calibration z (µm)  :", cal.pixelDepth, 3);
         gd.addMessage("Spatial distribution", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("Radius for neighboring analysis", radiusNei, 2);
+        gd.addNumericField("Radius for neighboring analysis : ", radiusNei, 2);
+        gd.addNumericField("Number of neighborgs : ", nbNei, 2);
         gd.addCheckbox("Do comparaison to random distribution", false);
         gd.showDialog();
         int[] chChoices = new int[channels.length];
@@ -373,6 +388,7 @@ public class Sox_10_Tools {
         cal.pixelHeight = cal.pixelWidth;
         cal.pixelDepth = gd.getNextNumber();
         radiusNei = gd.getNextNumber();
+        nbNei = (int)gd.getNextNumber();
         doF = gd.getNextBoolean();
         if (gd.wasCanceled())
                 chChoices = null;
@@ -634,49 +650,34 @@ public class Sox_10_Tools {
     }
 
     
-    /**
-     * Return dilated object restriced to image borders
-     * @param img
-     * @param obj
-     * @return
-     */
-    private double getVolumeObjInside(ImagePlus img, Object3D obj) {
-        double x = obj.getCenterX();
-        double y = obj.getCenterY();
-        double z = obj.getCenterZ();
-        Object3DVoxels sphere = new Object3DVoxels();
-        sphere.createSphereUnit((float)x, (float)y, (float)z, (float)radiusNei);
-        // check if object go outside image
-        if (sphere.getXmin() < 0 || sphere.getXmax() > img.getWidth() || sphere.getYmin() < 0 || sphere.getYmax() > img.getHeight()
-                || sphere.getZmin() < 0 || sphere.getZmax() > img.getNSlices()) {
-            Object3DVoxels voxObj = new Object3DVoxels(sphere.listVoxels(ImageHandler.wrap(img)));
-            return(voxObj.getVolumeUnit());
+    public void getDistNeighbors(Object3D obj, Objects3DPopulation pop, DescriptiveStatistics cellNbNeighborsDistMean, 
+           DescriptiveStatistics cellNbNeighborsDistMax) {
+        DescriptiveStatistics stats = new DescriptiveStatistics();
+        double[] dist= pop.kClosestDistancesSquared(obj.getCenterX(), obj.getCenterY(), obj.getCenterZ(), nbNei);
+        for (double d : dist) {
+           stats.addValue(Math.sqrt(d)); 
         }
-        else
-            return(sphere.getVolumeUnit());
-    }
-    
-    public double getNbNeighbors(Object3D obj, Objects3DPopulation pop, ImagePlus img) {
-        double vol = getVolumeObjInside(img, obj);
-        ArrayList<Object3D> objs = pop.getObjectsWithinDistanceCenter(obj, radiusNei);
-        int nobj = objs.size();
-        return nobj/vol;
+        cellNbNeighborsDistMax.addValue(stats.getMax());
+        cellNbNeighborsDistMean.addValue(stats.getMean());
     }
     
     /**
     * Compute global cells parameters
     * @param cellPop cell population
     * @param imgCell read cell intensity
+     * @param roiName
+     * @param roi
     * @param imgName image file
     * @param outDirResults results file
-     * @param results buffer
+     * @throws java.io.IOException
     **/
     public void computeNucParameters(Objects3DPopulation cellPop, ImagePlus imgCell, String roiName, Roi roi,
-          String imgName, String outDirResults, BufferedWriter results, BufferedWriter distances) throws IOException {
+          String imgName, String outDirResults) throws IOException {
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
         DescriptiveStatistics cellVolume = new DescriptiveStatistics();
-        DescriptiveStatistics cellNbNeighbors = new DescriptiveStatistics();
+        DescriptiveStatistics cellNbNeighborsDistMean = new DescriptiveStatistics();
+        DescriptiveStatistics cellNbNeighborsDistMax = new DescriptiveStatistics();
         double cellVolumeSum = 0.0;
         // do individual stats
         cellPop.createKDTreeCenters();
@@ -688,17 +689,16 @@ public class Sox_10_Tools {
             cellIntensity.addValue(cellObj.getIntegratedDensity(ImageHandler.wrap(imgCell)));
             cellVolume.addValue(cellObj.getVolumeUnit());
             cellVolumeSum += cellObj.getVolumeUnit();
-            cellNbNeighbors.addValue( getNbNeighbors(cellObj, cellPop, imgCell) );
-            distances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\n");
+            getDistNeighbors(cellObj, cellPop, cellNbNeighborsDistMean, cellNbNeighborsDistMax);
+            outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\n");
         }
-        distances.flush();
+        outPutDistances.flush();
         double sdiF = Double.NaN;
         if (doF) {
             IJ.showStatus("Computing spatial distribution G Function ...");
             sdiF = processGParallel(cellPop, imgCell, outDirResults, imgName, roiName, roi);
         }
-        
-        
+       
         double minDistCenterMean = alldistances.getMean(); 
         double minDistCenterSD = alldistances.getStdDev();
         // compute statistics
@@ -707,12 +707,21 @@ public class Sox_10_Tools {
         double cellVolumeMean = cellVolumeSum/cellPop.getNbObjects();
         double cellVolumeSD = cellVolume.getStandardDeviation();
         double roiVol = imgCell.getWidth()*imgCell.getHeight()*imgCell.getNSlices()*imgCell.getCalibration().pixelDepth;
-        double neiMean = cellNbNeighbors.getMean();
-        double neiSD = cellNbNeighbors.getStandardDeviation();
+        double neiMeanMean = cellNbNeighborsDistMean.getMean();
+        double neiMeanSD = cellNbNeighborsDistMean.getStandardDeviation();
+        double neiMaxMean = cellNbNeighborsDistMax.getMean();
+        double neiMaxSD = cellNbNeighborsDistMax.getStandardDeviation();
         
-        results.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+"\t"+
-                cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+neiMean+"\t"+neiSD+"\t"+sdiF+"\n");
+        outPutResults.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+"\t"+
+                cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+neiMeanMean+"\t"+neiMeanSD+"\t"+neiMaxMean+"\t"+neiMaxSD+"\t"+sdiF+"\n");
         
-        results.flush();
+        outPutResults.flush();
+    }
+    
+    
+    public void closeResults() throws IOException {
+       outPutResults.close();
+       outPutDistances.close();         
+
     }
 }
