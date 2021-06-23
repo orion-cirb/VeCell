@@ -182,7 +182,7 @@ public class Sox_10_Tools {
                 break;    
             default :
                 for (int n = 0; n < chs; n++)
-                    channels[0] = Integer.toString(n);
+                    channels[n] = Integer.toString(n);
         }
         return(channels);         
     }
@@ -240,7 +240,7 @@ public class Sox_10_Tools {
      */ 
     public ClearCLBuffer median_filter(ClearCLBuffer  imgCL, double sizeXY, double sizeZ) {
         ClearCLBuffer imgCLMed = clij2.create(imgCL);
-        clij2.mean3DBox(imgCL, imgCLMed, sizeXY, sizeXY, sizeZ);
+        clij2.median3DBox(imgCL, imgCLMed, sizeXY, sizeXY, sizeZ);
         clij2.release(imgCL);
         return(imgCLMed);
     }
