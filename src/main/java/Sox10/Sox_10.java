@@ -6,15 +6,11 @@ package Sox10;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.plugin.frame.RoiManager;
 import ij.measure.Calibration;
-import ij.plugin.Duplicator;
 import ij.plugin.PlugIn;
 import java.awt.Rectangle;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -141,24 +137,40 @@ public class Sox_10 implements PlugIn {
                 options.setCrop(true);
                 
                 //reader.setSeries(nseries);
-                ImagePlus wholeImage = BF.openImagePlus(options)[0];
+                //ImagePlus wholeImage = BF.openImagePlus(options)[0];
                 
                 // For each roi open cropped image
                 for (Roi roi : rois) {
                     nucIndex++;
                     Rectangle rectRoi = roi.getBounds();
                     options.setCropRegion(nseries-1, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
+                    // cells image
                     ImagePlus imgCells = BF.openImagePlus(options)[0];
-                 
                     Objects3DPopulation cellPop = sox.findCellsDoG(imgCells, roi);
                     System.out.println(cellPop.getNbObjects()+" cells found");
-                    sox.saveCellsImage(cellPop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
+                    
+                    // Vessel channel
+                    Objects3DPopulation olig2Pop = new Objects3DPopulation();
+                    ArrayList<Double> dist = new ArrayList<>();
+                    ArrayList<Double> diam = new ArrayList<>();
+                    // olig2 image
+                    if (sox.olig2){
+                        options.setCBegin(nseries-1, channelIndex[0]);
+                        options.setCEnd(nseries-1, channelIndex[0]); 
+                        ImagePlus imgOlig2 = BF.openImagePlus(options)[0];
+                        ImagePlus imgVesselTube = sox.tubeness(imgOlig2, roi);
+                        olig2Pop = sox.findVessel(imgVesselTube);
+                        dist = sox.findCellVesselDist(cellPop, olig2Pop);
+                        ImagePlus imgVesselMap = sox.localThickness3D(imgVesselTube);
+                        diam = sox.findVesselDiameter(cellPop, olig2Pop, imgVesselMap);
+                    }
+                    sox.saveCellsImage(cellPop, olig2Pop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
                                         
                     // find parameters
-                    sox.computeNucParameters(cellPop, imgCells, roi.getName(), roi, rootName, outDirResults);
+                    sox.computeNucParameters(cellPop, olig2Pop, dist, diam, imgCells, roi.getName(), roi, rootName, outDirResults);
                     sox.closeImages(imgCells);
                 }
-                sox.closeImages(wholeImage);
+                //sox.closeImages(wholeImage);
                 options.setSeriesOn(nseries-1, false);
             }
             sox.closeResults();

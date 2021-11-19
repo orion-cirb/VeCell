@@ -100,7 +100,7 @@
 	<dependency>
                 <groupId>net.imagej</groupId>
                 <artifactId>ij</artifactId>
-                <version>1.50g</version>
+                <version>1.53j</version>
                 <type>jar</type>
             </dependency>
 	 <dependency>
@@ -140,6 +140,12 @@
 	  <version>2.2.0.19</version>
 	  <type>jar</type>
 	 </dependency>
+	 <dependency>
+	  <groupId>sc.fiji</groupId>
+	  <artifactId>LocalThickness_</artifactId>
+	  <version>4.0.3</version>
+	  <type>jar</type>
+	 </dependency>
 	</dependencies>
         <repositories>
             <repository>
@@ -164,8 +170,8 @@
                     <version>2.3.2</version>
                     <configuration>
                         <showDeprecation>true</showDeprecation>
-                        <source>1.7</source>
-                        <target>1.7</target>
+                        <source>1.8</source>
+                        <target>1.8</target>
                     </configuration>
 		</plugin>
                 <plugin>
