@@ -36,6 +36,7 @@ import loci.plugins.util.ImageProcessorReader;
 import static mcib3d.geom.Object3D_IJUtils.createObject3DVoxels;
 import mcib3d.geom.Point3D;
 import mcib3d.geom.Voxel3D;
+import mcib3d.image3d.ImageFloat;
 import mcib3d.utils.ArrayUtil;
 import mcib3d.utils.CDFTools;
 import mcib3d.utils.ThreadUtil;
@@ -445,17 +446,17 @@ public class Sox_10_Tools {
         FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
         outPutResults = new BufferedWriter(fileResults);
         outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
-                + "Cell mean volume\t Cell sd volume\ttotalVolume\tAverageDistanceToClosestNeighbor\tSDDistanceToClosestNeighbor"
-                + "\tMeanOfAverageDistance of "+nbNei+" neighbors"+"\tSDOfAverageDistance of "+nbNei+" neighbors"+"\tMeanOfMaxDistance of "+nbNei+" neighbors"+
-                "\tSDOfMaxDistance of "+nbNei+" neighbors\tAreaCurves\tDistributionAleatoireStat\tMean distance to olig2\tMean olig2 diameter"+
-                "\tolig2 MeanOfAverageDistance of "+nbNei+" neighbors"+"\tolig2 SDOfAverageDistance of "+nbNei+" neighbors"+"\tolig2 MeanOfMaxDistance of "+nbNei
-                +" neighbors"+"\tolig2 SDOfMaxDistance of "+nbNei+" neighbors\t\n");
+                + "Cell mean volume\t Cell sd volume\ttotal Volume\tAverage Distance To Closest Neighbor\tSD DistanceTo Closest Neighbor"
+                + "\tMean Of Average Distance of "+nbNei+" neighbors"+"\tSD Of Average Distance of "+nbNei+" neighbors"+"\tMean Of Max Distance of "+nbNei+" neighbors"+
+                "\tSD Of Max Distance of "+nbNei+" neighbors\tArea Curves\tDistribution Aleatoire Stat\tMean distance to olig2\tMean olig2 diameter"+
+                "\tolig2 Mean Of Average Distance of "+nbNei+" neighbors"+"\tolig2 SD Of Average Distance of "+nbNei+" neighbors"+"\tolig2 Mean Of Max Distance of "+nbNei
+                +" neighbors"+"\tolig2 SD Of Max Distance of "+nbNei+" neighbors\t\n");
         outPutResults.flush();
 
         // distances results
         FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
         outPutDistances = new BufferedWriter(fileDistances);
-        outPutDistances.write("Image name\tRoi name\tCellVolume\tDistanceToClosestNeighbor \n");
+        outPutDistances.write("Image name\tRoi name\tCell Volume\tDistance To Closest Neighbor \n");
         outPutDistances.flush();
     }
     
@@ -559,7 +560,7 @@ public class Sox_10_Tools {
                 Object3D obj = cellPop.getObject(i);
                 String name = obj.getName().substring(1,obj.getName().length()-1);
                 double dist = Double.parseDouble(name);
-                obj.draw(imhCell, (int)dist*10);
+                obj.draw(imhCell, (float)dist*10);
             }
             olig2Pop.draw(imhCell, 255);
         }
@@ -568,7 +569,11 @@ public class Sox_10_Tools {
         // save image for objects population
         ImagePlus imgCells = imhCell.getImagePlus();
         imgCells.setCalibration(cal);
-        IJ.run(imgCells, "Fire", "");
+        if (olig2) {
+            IJ.run(imgCells, "Fire", "");
+            IJ.run(imgCells, "Calibrate...", "function=None unit=*10µm");
+            IJ.run(imgCells, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=1 overlay show");
+        }
         FileSaver ImgObjectsFile = new FileSaver(imgCells);
         ImgObjectsFile.saveAsTiff(pathName); 
         closeImages(imgCells);

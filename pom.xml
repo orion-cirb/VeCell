@@ -39,8 +39,8 @@
 	</developers>
 
 	<scm>
-            <connection>scm:git:git://github.com/imagej/Sox_10.jar</connection>
-            <developerConnection>scm:git:git@github.com:imagej/Sox_10.jar</developerConnection>
+            <connection>scm:git:git://github.com/pmailly/Sox_10.jar</connection>
+            <developerConnection>scm:git:git@github.com:pmailly/Sox_10.jar</developerConnection>
             <tag>HEAD</tag>
             <url>https://github.com/pmailly/Sox_10.jar</url>
 	</scm>
