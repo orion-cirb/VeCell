@@ -36,7 +36,6 @@ import loci.plugins.util.ImageProcessorReader;
 import static mcib3d.geom.Object3D_IJUtils.createObject3DVoxels;
 import mcib3d.geom.Point3D;
 import mcib3d.geom.Voxel3D;
-import mcib3d.image3d.ImageFloat;
 import mcib3d.utils.ArrayUtil;
 import mcib3d.utils.CDFTools;
 import mcib3d.utils.ThreadUtil;
@@ -448,15 +447,13 @@ public class Sox_10_Tools {
         outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
                 + "Cell mean volume\t Cell sd volume\ttotal Volume\tAverage Distance To Closest Neighbor\tSD DistanceTo Closest Neighbor"
                 + "\tMean Of Average Distance of "+nbNei+" neighbors"+"\tSD Of Average Distance of "+nbNei+" neighbors"+"\tMean Of Max Distance of "+nbNei+" neighbors"+
-                "\tSD Of Max Distance of "+nbNei+" neighbors\tArea Curves\tDistribution Aleatoire Stat\tMean distance to olig2\tMean olig2 diameter"+
-                "\tolig2 Mean Of Average Distance of "+nbNei+" neighbors"+"\tolig2 SD Of Average Distance of "+nbNei+" neighbors"+"\tolig2 Mean Of Max Distance of "+nbNei
-                +" neighbors"+"\tolig2 SD Of Max Distance of "+nbNei+" neighbors\t\n");
+                "\tSD Of Max Distance of "+nbNei+" neighbors\tArea Curves\tDistribution Aleatoire Stat\tMean distance to Vessel\tMean Vessel diameter\n");
         outPutResults.flush();
 
         // distances results
         FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
         outPutDistances = new BufferedWriter(fileDistances);
-        outPutDistances.write("Image name\tRoi name\tCell Volume\tDistance To Closest Neighbor \n");
+        outPutDistances.write("Image name\tRoi name\tCell Volume\tDistance To Closest Neighbor\tDistance to Closest Vessel \n");
         outPutDistances.flush();
     }
     
@@ -467,8 +464,7 @@ public class Sox_10_Tools {
      * @return 
      */
     public int[] dialog(String[] channels) {
-        String[] chNames = {"Nucleus/Vessel", "TF"};
-            
+        String[] chNames = (channels.length == 2) ? new String[]{"Nucleus/Vessel", "TF"} : new String[]{"Nucleus", "Vessel", "TF"};
         GenericDialogPlus gd = new GenericDialogPlus("Parameters");
         gd.setInsets​(0, 80, 0);
         gd.addImage(icon);
@@ -488,7 +484,6 @@ public class Sox_10_Tools {
         gd.addNumericField("radius 2 (pixels) : ", sigma2, 1);
         gd.addMessage("Image calibration", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Calibration xy (µm)  :", cal.pixelWidth, 3);
-        if ( cal.pixelDepth == 1) cal.pixelDepth = 0.5;
         gd.addNumericField("Calibration z (µm)  :", cal.pixelDepth, 3);
         gd.addMessage("Spatial distribution", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Radius for neighboring analysis : ", radiusNei, 2);
@@ -857,10 +852,13 @@ public class Sox_10_Tools {
             cellIntensity.addValue(cellObj.getIntegratedDensity(ImageHandler.wrap(imgCell)));
             cellVolume.addValue(cellObj.getVolumeUnit());
             cellVolumeSum += cellObj.getVolumeUnit();
-            getDistNeighbors(cellObj, cellPop, cellNbNeighborsDistMean, cellNbNeighborsDistMax);
-            if (olig2)
-                getDistNeighbors(cellObj, olig2Pop, cellVesselNbNeighborsDistMean, cellVesselNbNeighborsDistMax);
-            outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\n");
+            double vesselDist = Double.NaN;
+            if (olig2) {
+                Object3D vesselObj = olig2Pop.closestBorder(cellObj);
+                vesselDist = cellObj.distBorderUnit(vesselObj);
+            }
+            getDistNeighbors(cellObj, olig2Pop, cellVesselNbNeighborsDistMean, cellVesselNbNeighborsDistMax);
+            outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+vesselDist+"\n");
         }
         outPutDistances.flush();
         double sdiF = Double.NaN;
