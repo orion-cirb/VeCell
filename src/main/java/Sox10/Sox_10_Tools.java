@@ -856,11 +856,13 @@ public class Sox_10_Tools {
             if (olig2) {
                 Object3D vesselObj = olig2Pop.closestBorder(cellObj);
                 vesselDist = cellObj.distBorderUnit(vesselObj);
+                getDistNeighbors(cellObj, olig2Pop, cellVesselNbNeighborsDistMean, cellVesselNbNeighborsDistMax);
+                outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+vesselDist+"\n");
+                outPutDistances.flush();
             }
-            getDistNeighbors(cellObj, olig2Pop, cellVesselNbNeighborsDistMean, cellVesselNbNeighborsDistMax);
-            outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+vesselDist+"\n");
+            getDistNeighbors(cellObj, cellPop, cellNbNeighborsDistMean, cellNbNeighborsDistMax);
         }
-        outPutDistances.flush();
+        
         double sdiF = Double.NaN;
         double areaCurves = Double.NaN;
         if (doF) {
