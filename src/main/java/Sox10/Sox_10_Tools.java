@@ -860,6 +860,10 @@ public class Sox_10_Tools {
                 outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+vesselDist+"\n");
                 outPutDistances.flush();
             }
+            else {
+                outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+"-\n");
+                outPutDistances.flush();
+            }
             getDistNeighbors(cellObj, cellPop, cellNbNeighborsDistMean, cellNbNeighborsDistMax);
         }
         
