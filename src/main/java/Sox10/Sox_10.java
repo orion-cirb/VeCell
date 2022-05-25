@@ -8,7 +8,9 @@ import ij.ImagePlus;
 import ij.gui.Roi;
 import ij.plugin.frame.RoiManager;
 import ij.measure.Calibration;
+import ij.plugin.ImageCalculator;
 import ij.plugin.PlugIn;
+import ij.plugin.RoiScaler;
 import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
@@ -104,8 +106,7 @@ public class Sox_10 implements PlugIn {
             
             // write headers for results tables
             sox.writeHeaders(outDirResults);
-            
-                
+                        
             for (String f : imageFiles) {
                 String rootName = FilenameUtils.getBaseName(f);
                 reader.setId(f);
@@ -113,7 +114,7 @@ public class Sox_10 implements PlugIn {
                 String roi_file  = (new File(imageDir+rootName+".zip").exists()) ? imageDir+rootName+".zip" :  ((new File(imageDir+rootName+".roi").exists()) ? imageDir+rootName+".roi" : null);
                 if (roi_file == null) {
                     IJ.showStatus("No ROI file found !") ;
-                    IJ.log("No ROIs found ! byebye \n");
+                    IJ.log("No ROIs found ! bye bye \n");
                     return;
                 }
                 List<Roi> rois = new ArrayList<>();
@@ -124,54 +125,62 @@ public class Sox_10 implements PlugIn {
                 
                 ImporterOptions options = new ImporterOptions();
                 options.setId(f);
-                options.setStitchTiles(false);
-                options.setOpenAllSeries(false);
-               
-                // open Cell channel, for all series
-                int nseries = reader.getSeriesCount();
-                options.setCBegin(nseries-1, channelIndex[1]);
-                options.setCEnd(nseries-1, channelIndex[1]); 
-                options.setSeriesOn(nseries-1, true);
+                options.setSplitChannels(true);
+                // open Cell channel
+                // case Zeiss 
+                // take first serie in image pyramidal
+                int nSeries = reader.getSeriesCount();
+                int series = (fileExt.equals("czi")) ? 0 : nSeries -1;
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                 options.setQuiet(true);
                 options.setCrop(true);
-                
-                //reader.setSeries(nseries);
-                //ImagePlus wholeImage = BF.openImagePlus(options)[0];
                 
                 // For each roi open cropped image
                 for (Roi roi : rois) {
                     nucIndex++;
                     Rectangle rectRoi = roi.getBounds();
-                    options.setCropRegion(nseries-1, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
+                    options.setCropRegion(series, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
+                    options.setCBegin(series, channelIndex[2]);
+                    options.setCEnd(series, channelIndex[2]); 
                     // cells image
                     ImagePlus imgCells = BF.openImagePlus(options)[0];
-                    Objects3DPopulation cellPop = sox.findCellsDoG(imgCells, roi);
+                    Objects3DPopulation cellPop = new Objects3DPopulation();
+                    if (sox.cellsDetection.equals("DOG"))
+                        cellPop = sox.findCellsDoG(imgCells, roi);
+                    else
+                        cellPop = sox.stardistNucleiPop(imgCells, roi);
                     System.out.println(cellPop.getNbObjects()+" cells found");
                     
                     // Vessel channel
-                    Objects3DPopulation olig2Pop = new Objects3DPopulation();
+                    Objects3DPopulation vesselPop = new Objects3DPopulation();
                     ArrayList<Double> dist = new ArrayList<>();
                     ArrayList<Double> diam = new ArrayList<>();
-                    // olig2 image
-                    if (sox.olig2){
-                        options.setCBegin(nseries-1, channelIndex[0]);
-                        options.setCEnd(nseries-1, channelIndex[0]); 
-                        ImagePlus imgOlig2 = BF.openImagePlus(options)[0];
-                        ImagePlus imgVesselTube = sox.tubeness(imgOlig2, roi);
-                        olig2Pop = sox.findVessel(imgVesselTube);
-                        dist = sox.findCellVesselDist(cellPop, olig2Pop);
+                    // vessel image
+                    if (sox.vessel){
+                        options.setCBegin(series, channelIndex[0]);
+                        options.setCEnd(series, channelIndex[0]); 
+                        ImagePlus imgVessel1 = BF.openImagePlus(options)[0];
+                        options.setCBegin(series, channelIndex[1]);
+                        options.setCEnd(series, channelIndex[1]);
+                        ImagePlus imgVessel2 = BF.openImagePlus(options)[0];
+                        ImagePlus imgVessel =  new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
+                        sox.closeImages(imgVessel1);
+                        sox.closeImages(imgVessel2);
+                        ImagePlus imgVesselTube = sox.tubeness(imgVessel);
+                        vesselPop = sox.findVessel(imgVesselTube, roi);
+                        dist = sox.findCellVesselDist(cellPop, vesselPop);
                         ImagePlus imgVesselMap = sox.localThickness3D(imgVesselTube);
-                        diam = sox.findVesselDiameter(cellPop, olig2Pop, imgVesselMap);
+                        diam = sox.findVesselDiameter(cellPop, vesselPop, imgVesselMap);
+                        sox.closeImages(imgVesselTube);
+                        sox.closeImages(imgVesselMap);
                     }
-                    sox.saveCellsImage(cellPop, olig2Pop, imgCells, outDirResults+rootName+"_"+roi.getName()+".tif");
+                    
+                    sox.saveCellsImage(cellPop, vesselPop, imgCells, dist, outDirResults+rootName+"_"+roi.getName()+".tif");
                                         
                     // find parameters
-                    sox.computeNucParameters(cellPop, olig2Pop, dist, diam, imgCells, roi.getName(), roi, rootName, outDirResults);
+                    sox.computeNucParameters(cellPop, vesselPop, dist, diam, imgCells, roi.getName(), roi, rootName, outDirResults);
                     sox.closeImages(imgCells);
                 }
-                //sox.closeImages(wholeImage);
-                options.setSeriesOn(nseries-1, false);
             }
             sox.closeResults();
             IJ.showStatus("Processing done....");

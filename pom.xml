@@ -52,21 +52,63 @@
 	</properties>
 
 	<dependencies>
+                    <!-- Clipper -->
             <dependency>
-                <groupId>ome</groupId>
-                <artifactId>bioformats_package</artifactId>
-                <version>5.2.2</version>
+                <groupId>de.lighti</groupId>
+                <artifactId>Clipper</artifactId>
+                <version>6.4.2</version>
+                <scope>system</scope>
+                <systemPath>${basedir}/lib/Clipper-6.4.2.jar</systemPath>
             </dependency>
             <dependency>
-                <groupId>ome</groupId>
-                <artifactId>formats-common</artifactId>
-                <version>5.0.0</version>
-                <type>jar</type>
+                <groupId>de.csbdresden</groupId>
+                <artifactId>csbdeep</artifactId>
+                <version>0.3.5-SNAPSHOT</version>
             </dependency>
             <dependency>
+                <groupId>net.imagej</groupId>
+                <artifactId>ij</artifactId>
+                <version>1.53r</version>
+                  <type>jar</type>
+            </dependency>                
+            
+            <dependency>
                 <groupId>ome</groupId>
-                <artifactId>formats-api</artifactId>
-                <version>5.0.0</version>
+                <artifactId>bio-formats_plugins</artifactId>
+                <version>6.8.1</version>
+            </dependency>
+            
+            <dependency>
+		<groupId>org.framagit.mcib3d</groupId>
+		<artifactId>mcib3d-core</artifactId>
+		<version>4.0.87</version>		
+            </dependency>
+
+            
+            <dependency>
+                    <groupId>ome</groupId>
+                    <artifactId>formats-common</artifactId>
+                    <version>5.2.4</version>
+                    <type>jar</type>
+             </dependency>  
+                          
+            <dependency>
+                  <groupId>net.haesleinhuepf</groupId>
+                  <artifactId>clij-clearcl</artifactId>
+                  <version>2.0.0.21</version>
+                  <type>jar</type>
+            </dependency>
+            
+            <dependency>
+                  <groupId>net.haesleinhuepf</groupId>
+                  <artifactId>clij2_</artifactId>
+                  <version>2.5.1.4</version>
+                  <type>jar</type>
+            </dependency>
+            <dependency>
+                <groupId>net.imglib2</groupId>
+                <artifactId>imglib2</artifactId>
+                <version>5.12.0</version>
                 <type>jar</type>
             </dependency>
             <dependency>
@@ -75,87 +117,28 @@
                 <version>20120621</version>
                 <type>jar</type>
             </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-math3</artifactId>
-                <version>3.6.1</version>
-                <type>jar</type>
-            </dependency>
-            <dependency>
-                <groupId>org.framagit.mcib3d</groupId>
-                <artifactId>mcib3d-core</artifactId>
-                <version>3.96.3</version>
-            </dependency>
-            <dependency>
-                <groupId>sc.fiji</groupId>
-                <artifactId>fiji-lib</artifactId>
-                <version>2.1.3-SNAPSHOT</version>
-                <type>jar</type>
-            </dependency>
-            <dependency>
-                <groupId>org.w3c</groupId>
-                <artifactId>dom</artifactId>
-                <version>2.3.0-jaxb-1.0.6</version>
-            </dependency>
-	<dependency>
-                <groupId>net.imagej</groupId>
-                <artifactId>ij</artifactId>
-                <version>1.53j</version>
-                <type>jar</type>
-            </dependency>
-	 <dependency>
-	  <groupId>net.imagej</groupId>
-	  <artifactId>ij-data</artifactId>
-	  <version>2.0.0-SNAPSHOT</version>
-	  <type>jar</type>
-	 </dependency>
-	 <dependency>
-	  <groupId>net.imagej</groupId>
-	  <artifactId>ij-tools</artifactId>
-	  <version>2.0.0-SNAPSHOT</version>
-	  <type>jar</type>
-         </dependency>
-	 
-	 <dependency>
-	  <groupId>net.imagej</groupId>
-	  <artifactId>imagej-ops</artifactId>
-	  <version>0.44.1-SNAPSHOT</version>
-	  <type>jar</type>
-	 </dependency>
-	 <dependency>
-	  <groupId>sc.fiji</groupId>
-	  <artifactId>VIB-lib</artifactId>
-	  <version>2.2.1-SNAPSHOT</version>
-	  <type>jar</type>
-	 </dependency>
-	 <dependency>
-	  <groupId>net.haesleinhuepf</groupId>
-	  <artifactId>clij-clearcl</artifactId>
-	  <version>2.0.0.21</version>
-	  <type>jar</type>
-	 </dependency>
-	 <dependency>
-	  <groupId>net.haesleinhuepf</groupId>
-	  <artifactId>clij2_</artifactId>
-	  <version>2.2.0.19</version>
-	  <type>jar</type>
-	 </dependency>
 	 <dependency>
 	  <groupId>sc.fiji</groupId>
 	  <artifactId>LocalThickness_</artifactId>
-	  <version>4.0.3</version>
+	  <version>4.0.4-SNAPSHOT</version>
+	  <type>jar</type>
+	 </dependency>
+	 <dependency>
+	  <groupId>org.framagit.mcib3d</groupId>
+	  <artifactId>mcib3d-plugins</artifactId>
+	  <version>4.0.63</version>
 	  <type>jar</type>
 	 </dependency>
 	</dependencies>
         <repositories>
             <repository>
 		<id>imagej.public</id>
-		<url>http://maven.imagej.net/content/groups/public</url>
+		<url>https://maven.imagej.net/content/groups/public</url>
             </repository>
             <repository>
                 <id>ome</id>
                 <name>Bio-Formats Repo</name>
-                <url>http://artifacts.openmicroscopy.org/artifactory/maven</url>
+                <url>https://artifacts.openmicroscopy.org/artifactory/maven</url>
             </repository>
             <repository>
                 <id>jitpack.io</id>

@@ -1,15 +1,18 @@
 package Sox10;
 
 
+import Sox10_StardistOrion.StarDist2D;
 import features.TubenessProcessor;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Plot;
 import ij.gui.Roi;
+import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.Duplicator;
+import ij.plugin.ImageCalculator;
 import ij.process.AutoThresholder;
 import ij.process.ImageProcessor;
 import java.awt.Color;
@@ -17,8 +20,10 @@ import java.awt.Font;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.ImageIcon;
@@ -46,7 +51,7 @@ import org.apache.commons.lang.ArrayUtils;
 import sc.fiji.localThickness.Clean_Up_Local_Thickness;
 import sc.fiji.localThickness.EDT_S1D;
 import sc.fiji.localThickness.Local_Thickness_Parallel;
-        
+import mcib_plugins.analysis.SpatialAnalysis;       
  /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose dots_Tools | Templates
@@ -60,27 +65,37 @@ import sc.fiji.localThickness.Local_Thickness_Parallel;
 public class Sox_10_Tools {
    
     // min volume in µm^3 for cells
-    public double minCell = 200;
+    public double minCell = 20;
     // max volume in µm^3 for cells
-    public double maxCell = 3000;
+    public double maxCell = 1000;
     // sigmas for DoG
-    private double sigma1 = 2;
-    private double sigma2 = 4;
+    private double sigma1 = 20;
+    private double sigma2 = 40;
     // Dog parameters
     private Calibration cal = new Calibration(); 
-    public boolean olig2 = false;
+    public boolean vessel = false;
     private boolean doF = false;
     private double radiusNei = 50; //neighboring radius
     private int nbNei = 10; // K neighborg
         
     private BufferedWriter outPutResults;
     private BufferedWriter outPutDistances;
-    //private BufferedWriter outPlot; 
     
-
+    // Stardist
+    private Object syncObject = new Object();
+    private final double stardistPercentileBottom = 0.2;
+    private final double stardistPercentileTop = 99.8;
+    private final double stardistProbThreshNuc = 0.80;
+    private final double stardistOverlayThreshNuc = 0.25;
+    private File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
+    private String stardistOutput = "Label Image"; 
+    public String stardistCellModel = "";
+    
+    public String[] cellsDetections = {"Stardist", "DOG"};
+    public String cellsDetection = "";
     // dots threshold method
     private String thMet = "Moments";
-    private String vesselThMet = "Otsu";
+    private String vesselThMet = "Moments";
     
     public CLIJ2 clij2 = CLIJ2.getInstance();
     
@@ -141,7 +156,7 @@ public class Sox_10_Tools {
     public String[] findChannels (String imageName, IMetadata meta, ImageProcessorReader reader) throws DependencyException, ServiceException, FormatException, IOException {
         int chs = reader.getSizeC();
         if (chs == 3)
-            olig2 = true;
+            vessel = true;
         String[] channels = new String[chs];
         String imageExt =  FilenameUtils.getExtension(imageName);
         switch (imageExt) {
@@ -156,7 +171,7 @@ public class Sox_10_Tools {
                 break;
             case "lif" :
                 for (int n = 0; n < chs; n++) 
-                    if (meta.getChannelID(0, n) == null)
+                    if (meta.getChannelID(0, n) == null || meta.getChannelName(0, n) == null)
                         channels[n] = Integer.toString(n);
                     else 
                         channels[n] = meta.getChannelName(0, n).toString();
@@ -216,13 +231,30 @@ public class Sox_10_Tools {
         img.close();
     }
     
-    public Objects3DPopulation getPopFromImage(ImagePlus img) {
-        // label binary images first
-        ImageLabeller labeller = new ImageLabeller();
-        ImageInt labels = labeller.getLabels(ImageHandler.wrap(img));
-        Objects3DPopulation pop = new Objects3DPopulation(labels);
-        return pop;
-    }
+     /**
+     * return objects population in an ClearBuffer image
+     * @param imgCL
+     * @return pop objects population
+     */
+
+    public Objects3DPopulation getPopFromClearBuffer(ClearCLBuffer imgBin, double min, double max) {
+        ClearCLBuffer labelsCL = clij2.create(imgBin);
+        clij2.connectedComponentsLabelingBox(imgBin, labelsCL);
+        ClearCLBuffer labelsSizeFilter = clij2.create(imgBin);
+        // filter size
+        clij2.excludeLabelsOutsideSizeRange(labelsCL, labelsSizeFilter, min/(cal.pixelWidth*cal.pixelWidth*cal.pixelDepth),
+                max/(cal.pixelWidth*cal.pixelWidth*cal.pixelDepth));
+        clij2.release(labelsCL);
+        ImagePlus img = clij2.pull(labelsSizeFilter);
+        clij2.release(labelsSizeFilter);
+        ImageHandler imh = ImageHandler.wrap(img);
+        closeImages(img);
+        Objects3DPopulation pop = new Objects3DPopulation(imh);
+        pop.setCalibration(cal.pixelWidth, cal.pixelDepth, cal.getUnit());
+        imh.closeImagePlus();
+        return(pop);
+    }  
+    
     
    /**
      * compute local thickness
@@ -289,6 +321,7 @@ public class Sox_10_Tools {
             cellDist.add(dist);	
             cellObj.setName(String.valueOf(dist));
         }
+        cellPop.updateNamesAndValues();
         return(cellDist);
     }
     
@@ -297,20 +330,12 @@ public class Sox_10_Tools {
      * @param img
      * @return 
      */
-    public ImagePlus tubeness(ImagePlus img, Roi roi) {
-        double sigma = 2;
+    public ImagePlus tubeness(ImagePlus img) {
         ClearCLBuffer imgCL = clij2.push(img); 
-        ClearCLBuffer imgCLMed = median_filter(imgCL, sigma, sigma);
-        clij2.release(imgCL);
-        ImagePlus imgMed = clij2.pull(imgCLMed); 
-        clij2.release(imgCLMed);
-        TubenessProcessor tp = new TubenessProcessor(sigma, true);
-        ImagePlus imgTube = tp.generateImage(imgMed);
-        img.close();
-        roi.setLocation(0, 0);
-        IJ.setBackgroundColor(0, 0, 0);
-        imgTube.setRoi(roi);
-        IJ.run(imgTube, "Clear Outside", "stack");
+        ClearCLBuffer imgCLDOG = DOG(imgCL, 5, 10);
+        clij2.release(imgCL);        
+        ImagePlus imgTube = clij2.pull(imgCLDOG); 
+        clij2.release(imgCLDOG);
         return(imgTube);
     }
     
@@ -336,13 +361,19 @@ public class Sox_10_Tools {
         return(astroDiam);
     }
     
-    public Objects3DPopulation findVessel(ImagePlus img) {
+    public Objects3DPopulation findVessel(ImagePlus img, Roi roi) {
         ClearCLBuffer imgCL = clij2.push(img);
         ClearCLBuffer threshold = threshold(imgCL, vesselThMet); 
         clij2.release(imgCL);
-        ImagePlus imgVesselTube = clij2.pull(threshold);
+        ImagePlus imgTh = clij2.pull(threshold);
+        roi.setLocation(0, 0);
+        IJ.setBackgroundColor(0, 0, 0);
+        imgTh.setRoi(roi);
+        IJ.run(imgTh, "Clear Outside", "stack");
+        threshold = clij2.push(imgTh);
+        closeImages(imgTh);
+        Objects3DPopulation vesselPop = getPopFromClearBuffer(threshold, 0, Double.MAX_VALUE);
         clij2.release(threshold);
-        Objects3DPopulation vesselPop = getPopFromImage(imgVesselTube);
         System.out.println(vesselPop.getNbObjects()+" vessels found");
         return(vesselPop);
     }
@@ -434,6 +465,19 @@ public class Sox_10_Tools {
         return(ext);
     }
     
+     /*
+    Find starDist models in Fiji models folder
+    */
+    public String[] findStardistModels() {
+        FilenameFilter filter = (dir, name) -> name.endsWith(".zip");
+        File[] modelList = modelsPath.listFiles(filter);
+        String[] models = new String[modelList.length];
+        for (int i = 0; i < modelList.length; i++) {
+            models[i] = modelList[i].getName();
+        }
+        Arrays.sort(models);
+        return(models);
+    } 
     
     /**
      * Write headers for results file
@@ -457,27 +501,39 @@ public class Sox_10_Tools {
         outPutDistances.flush();
     }
     
-    /**
+   /**
      * Dialog 
      * 
      * @param channels
      * @return 
      */
     public int[] dialog(String[] channels) {
-        String[] chNames = (channels.length == 2) ? new String[]{"Nucleus/Vessel", "TF"} : new String[]{"Nucleus", "Vessel", "TF"};
+        String[] models = findStardistModels();
+        String[] chNames = new String[]{"Vessel1", "Vessel2", "Sox"};
+        String[] methods = AutoThresholder.getMethods();
         GenericDialogPlus gd = new GenericDialogPlus("Parameters");
         gd.setInsets​(0, 80, 0);
         gd.addImage(icon);
         gd.addMessage("Channels selection", Font.getFont("Monospace"), Color.blue);
         int index = 0;
-        for (String chName : channels) {
-            gd.addChoice(chNames[index]+" : ", channels, channels[index]);
+        for (String chName : chNames) {
+            gd.addChoice(chName+" : ", channels, channels[index]);
             index++;
         }
-        String[] methods = AutoThresholder.getMethods();
         gd.addMessage("Cells parameters", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Min cell size (µm3) : ", minCell, 3);
         gd.addNumericField("Max cell size (µm3) : ", maxCell, 3);
+        
+        gd.addMessage("--- Stardist model ---", Font.getFont(Font.MONOSPACED), Color.blue);
+        if (models.length > 0) {
+            gd.addChoice("StarDist cell model :",models, models[0]);
+        }
+        else {
+            gd.addMessage("No StarDist model found in Fiji !!", Font.getFont("Monospace"), Color.red);
+            gd.addFileField("StarDist cell model :", stardistCellModel);
+        }
+        gd.addChoice("Cells detection method : ", cellsDetections, cellsDetection);
+        gd.addMessage("--- DOG detection ---", Font.getFont(Font.MONOSPACED), Color.blue);
         gd.addChoice("Thresholding method :", methods, thMet);
         gd.addMessage("Difference of Gaussian (radius1 < radius2)", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("radius 1 (pixels) : ", sigma1, 1);
@@ -492,12 +548,20 @@ public class Sox_10_Tools {
         gd.addCheckbox("Compute distance to vessel", false);
         gd.addChoice("Vessel thresholding method :", methods, vesselThMet);
         gd.showDialog();
-        int[] chChoices = new int[channels.length];
+        
+        int[] chChoices = new int[chNames.length];
         for (int n = 0; n < chChoices.length; n++) {
             chChoices[n] = ArrayUtils.indexOf(channels, gd.getNextChoice());
         }
         minCell = gd.getNextNumber();
         maxCell = gd.getNextNumber();
+        if (models.length > 0) {
+            stardistCellModel = modelsPath+File.separator+gd.getNextChoice();
+        }
+        else {
+            stardistCellModel = gd.getNextString();
+        }
+        cellsDetection = gd.getNextChoice();
         thMet = gd.getNextChoice();
         sigma1 = gd.getNextNumber();
         sigma2 = gd.getNextNumber();
@@ -507,7 +571,7 @@ public class Sox_10_Tools {
         radiusNei = gd.getNextNumber();
         nbNei = (int)gd.getNextNumber();
         doF = gd.getNextBoolean();
-        olig2 = gd.getNextBoolean();
+        vessel = gd.getNextBoolean();
         vesselThMet = gd.getNextChoice();
         if (gd.wasCanceled())
                 chChoices = null;
@@ -533,13 +597,44 @@ public class Sox_10_Tools {
         roi.setLocation(0, 0);
         IJ.setBackgroundColor(0, 0, 0);
         IJ.run(imgBin, "Clear Outside", "stack");
-        imgBin.setCalibration(img.getCalibration());
-        Objects3DPopulation pmlPop = new Objects3DPopulation(getPopFromImage(imgBin).getObjectsWithinVolume(minCell, maxCell, true));
+        Objects3DPopulation pmlPop = getPopFromClearBuffer(clij2.push(imgBin), minCell, maxCell);
         closeImages(imgBin);
         return(pmlPop);
     } 
     
+      /** Look for all nuclei
+    Do z slice by slice stardist 
+    * return nuclei population
+    */
+   public Objects3DPopulation stardistNucleiPop(ImagePlus imgNuc, Roi roi) throws IOException{
+       ImagePlus img =  new Duplicator().run(imgNuc);
+       ClearCLBuffer imgCL = clij2.push(img);
+       ClearCLBuffer imgCLM = median_filter(imgCL, 2, 2);
+       clij2.release(imgCL);
+       ImagePlus imgM = clij2.pull(imgCLM);
+       clij2.release(imgCLM);
+       closeImages(img);
 
+       // Go StarDist
+       File starDistModelFile = new File(stardistCellModel);
+       StarDist2D star = new StarDist2D(syncObject, starDistModelFile);
+       star.loadInput(imgM);
+       star.setParams(stardistPercentileBottom, stardistPercentileTop, stardistProbThreshNuc, stardistOverlayThreshNuc, stardistOutput);
+       star.run();
+       closeImages(imgM);
+       // label in 3D
+       ImagePlus nuclei = star.getLabelImagePlus();
+       nuclei.setRoi(roi);
+       roi.setLocation(0, 0);
+       IJ.setBackgroundColor(0, 0, 0);
+       IJ.run(nuclei, "Clear Outside", "stack");
+       imgCL = clij2.push(nuclei);
+       Objects3DPopulation nPop = getPopFromClearBuffer(imgCL, minCell, maxCell); 
+       clij2.release(imgCL);
+       closeImages(nuclei);
+       return(nPop);
+   }
+    
     
     /**
      * Create cells population image
@@ -548,25 +643,26 @@ public class Sox_10_Tools {
      * @param pathName
 
      */
-    public void saveCellsImage(Objects3DPopulation cellPop, Objects3DPopulation olig2Pop, ImagePlus img, String pathName) {
+    public void saveCellsImage(Objects3DPopulation cellPop, Objects3DPopulation vesselPop, ImagePlus img, ArrayList<Double> dists, String pathName) {
         ImageHandler imhCell = ImageHandler.wrap(img).createSameDimensions();
-        if (olig2) {
+        if (vessel) {
+            double maxDist = Collections.max(dists);
             for (int i = 0; i < cellPop.getNbObjects(); i++) {
                 Object3D obj = cellPop.getObject(i);
-                String name = obj.getName().substring(1,obj.getName().length()-1);
-                double dist = Double.parseDouble(name);
-                obj.draw(imhCell, (float)dist*10);
+                double dist = dists.get(i);
+                obj.draw(imhCell, (float)dist);
             }
-            olig2Pop.draw(imhCell, 255);
+            vesselPop.draw(imhCell, (int)maxDist+10);
         }
         else
-            cellPop.draw(imhCell, 255);
+            cellPop.draw(imhCell);
+        
         // save image for objects population
         ImagePlus imgCells = imhCell.getImagePlus();
         imgCells.setCalibration(cal);
-        if (olig2) {
+        if (vessel) {
             IJ.run(imgCells, "Fire", "");
-            IJ.run(imgCells, "Calibrate...", "function=None unit=*10µm");
+            IJ.run(imgCells, "Calibrate...", "function=None unit=µm");
             IJ.run(imgCells, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=1 overlay show");
         }
         FileSaver ImgObjectsFile = new FileSaver(imgCells);
@@ -576,26 +672,26 @@ public class Sox_10_Tools {
     }
     
     /** \brief bounding box of the population*/
-     protected void maskBounding(Objects3DPopulation pop, ImagePlus empty, Roi roi) {
-         int[] res = {Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 0};
-        
-         // get min, max z
-        for (Object3D obj : pop.getObjectsList()) {
-            int[] bb = obj.getBoundingBox();
-            if (res[4] > bb[4]) res[4]= bb[4];
-            if (res[5] < bb[5]) res[5]= bb[5];
-        }
-        
-        for (int z=res[4]; z<=res[5]; z++)
-        {
-            empty.setSlice(z);
-            ImageProcessor proc = empty.getProcessor();
-            empty.setRoi(roi);
-            IJ.setForegroundColor(255,255,255);
-            IJ.run(empty, "Fill", "slice");
-       }
-       IJ.run(empty, "Select None", "");
+     protected Object3D maskBounding(Objects3DPopulation pop, ImagePlus imgCells) {
+         // change to convex hull ?
+        ImageHandler imh = ImageHandler.wrap(imgCells).createSameDimensions();
+        pop.draw(imh, 255);
+        Object3D objMask = createObject3DVoxels(imh.getImagePlus(), 255);
+        imh.closeImagePlus();
+        int[] bbMask = objMask.getBoundingBox();
+        ImagePlus imgMask = new Duplicator().run(imgCells);
+        IJ.run(imgMask,"8-bit","");
+        Roi roi = new Roi(bbMask[0], bbMask[2], bbMask[1]-bbMask[0], bbMask[3] - bbMask[2]);
+        imgMask.setRoi(roi);
+        IJ.setForegroundColor(255,255,255);
+        IJ.run(imgMask, "Fill", "stack");
+        IJ.setBackgroundColor(0, 0, 0);
+        IJ.run(imgMask, "Clear Outside", "stack");
+        imgMask.deleteRoi();
+        objMask = createObject3DVoxels(imgMask, 255);
+        return(objMask);
     }
+     
     
     /**
     * For compute G function, with parallel version
@@ -608,16 +704,10 @@ public class Sox_10_Tools {
     public double[] processGParallel (Objects3DPopulation pop, ImagePlus imgCells, String outDirResults, String imgName, String roiName, Roi roi) {
         
         // change to convex hull ?
-        ImagePlus imgMask = new Duplicator().run(imgCells);
-        IJ.run(imgMask, "Select All", "");
-        IJ.run(imgMask, "Clear", "stack");
-        IJ.run(imgMask, "Select None", "");
-        maskBounding(pop, imgMask, roi);
-        Object3D mask = createObject3DVoxels(imgMask, 255);
-        closeImages(imgMask);
+        Object3D objMask = maskBounding(pop, imgCells);
         String outname = outDirResults + imgName + "_Gplot_" + roiName + ".tif";
         double minDist = Math.pow(3.0/4.0/Math.PI*minCell, 1.0/3.0) * 2; // calculate minimum cell radius -> *2 min distance
-        return processG(pop, mask, 50, minDist, outname, roiName);
+        return processG(pop, objMask, 50, minDist, outname, roiName);
   
     }
     
@@ -722,7 +812,7 @@ public class Sox_10_Tools {
         double[] res = {sdi_G, area}; 
         return res;
     }
-    
+
     public void showPlotData(String roiName,String imgName,ArrayUtil xObs, ArrayUtil yObs, ArrayUtil xRand, ArrayUtil yRand,BufferedWriter plotResults) 
             throws IOException{
         ArrayUtil a = (xObs.size()>xRand.size()) ? xObs : xRand;
@@ -832,7 +922,7 @@ public class Sox_10_Tools {
     * @param outDirResults results file
      * @throws java.io.IOException
     **/
-    public void computeNucParameters(Objects3DPopulation cellPop, Objects3DPopulation olig2Pop, ArrayList<Double> dist, ArrayList<Double> diam, ImagePlus imgCell, String roiName, Roi roi,
+    public void computeNucParameters(Objects3DPopulation cellPop, Objects3DPopulation vesselPop, ArrayList<Double> dist, ArrayList<Double> diam, ImagePlus imgCell, String roiName, Roi roi,
         String imgName, String outDirResults) throws IOException {
         
         DescriptiveStatistics cellIntensity = new DescriptiveStatistics();
@@ -853,10 +943,10 @@ public class Sox_10_Tools {
             cellVolume.addValue(cellObj.getVolumeUnit());
             cellVolumeSum += cellObj.getVolumeUnit();
             double vesselDist = Double.NaN;
-            if (olig2) {
-                Object3D vesselObj = olig2Pop.closestBorder(cellObj);
+            if (vessel) {
+                Object3D vesselObj = vesselPop.closestBorder(cellObj);
                 vesselDist = cellObj.distBorderUnit(vesselObj);
-                getDistNeighbors(cellObj, olig2Pop, cellVesselNbNeighborsDistMean, cellVesselNbNeighborsDistMax);
+                getDistNeighbors(cellObj, vesselPop, cellVesselNbNeighborsDistMean, cellVesselNbNeighborsDistMax);
                 outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+vesselDist+"\n");
                 outPutDistances.flush();
             }
@@ -875,11 +965,11 @@ public class Sox_10_Tools {
             sdiF = temp[0];
             areaCurves = temp[1];
         }
-        double olig2DistMean = 0;
-        double olig2DiamMean = 0;
-        if (olig2) {
-            olig2DistMean = dist.stream().mapToDouble(val -> val).average().orElse(0.0);
-            olig2DiamMean = diam.stream().mapToDouble(val -> val).average().orElse(0.0);
+        double vesselDistMean = 0;
+        double vesselDiamMean = 0;
+        if (vessel) {
+            vesselDistMean = dist.stream().mapToDouble(val -> val).average().orElse(0.0);
+            vesselDiamMean = diam.stream().mapToDouble(val -> val).average().orElse(0.0);
         }
         double minDistCenterMean = alldistances.getMean(); 
         double minDistCenterSD = alldistances.getStdDev();
@@ -900,7 +990,7 @@ public class Sox_10_Tools {
         
         outPutResults.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+"\t"+
                 cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+neiMeanMean+"\t"+neiMeanSD+"\t"+neiMaxMean+"\t"+neiMaxSD
-                +"\t"+areaCurves+"\t"+sdiF+"\t"+olig2DistMean+"\t"+olig2DiamMean+"\t"+neiVesselMeanMean+"\t"+neiVesselMeanSD+"\t"+neiVesselMaxMean
+                +"\t"+areaCurves+"\t"+sdiF+"\t"+vesselDistMean+"\t"+vesselDiamMean+"\t"+neiVesselMeanMean+"\t"+neiVesselMeanSD+"\t"+neiVesselMaxMean
                 +"\t"+neiVesselMaxSD+"\n");
         
         outPutResults.flush();
