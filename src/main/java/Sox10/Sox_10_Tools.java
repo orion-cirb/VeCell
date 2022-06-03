@@ -13,6 +13,7 @@ import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
+import ij.plugin.RoiScaler;
 import ij.process.AutoThresholder;
 import ij.process.ImageProcessor;
 import java.awt.Color;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.awt.Rectangle;
 import javax.swing.ImageIcon;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
@@ -285,20 +287,7 @@ public class Sox_10_Tools {
         cleanUp.run(imgLocThk.getProcessor());
         ImagePlus imgMap = cleanUp.getResultImage();
         imgMap.setCalibration(cal);
-        // Cleanup distance map remove all pixels = 2 
-        int width = imgMap.getWidth();
-        int height = imgMap.getHeight();
-        int depth = imgMap.getNSlices();
-        
-        for (int z = 0; z < depth; z ++) {
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    double voxInt = imgMap.getStack().getVoxel(x, y, z);
-                    if (voxInt <= 2)
-                       imgMap.getStack().setVoxel(x, y, z, 0);
-                }
-            }
-        }
+        IJ.run(imgMap, "Multiply...", "value="+cal.pixelWidth+" stack");
         closeImages(imgEDT);
         closeImages(imgLocThk);
         return(imgMap);
@@ -353,15 +342,17 @@ public class Sox_10_Tools {
             IJ.showStatus("Finding vessel diameter for cell "+i+"/"+astroNb);
             Object3D astroObj = astroPop.getObject(i);
             Object3D vesselObj = vesselPop.closestBorder(astroObj);
+            
             Voxel3D[] ptsBorder = astroObj.VoxelsBorderBorder(vesselObj);
             Point3D ptBorder = ptsBorder[1];
-            double diam = imgVesselmap.getImageStack().getVoxel((int)ptBorder.x, (int)ptBorder.y, (int)ptBorder.z);
-            astroDiam.add(diam*cal.pixelWidth);
+            
+            double diam = imgVesselmap.getImageStack().getVoxel((int)ptBorder.x, (int)ptBorder.y, (int)(ptBorder.z+1.00));
+            astroDiam.add(diam);
         }
         return(astroDiam);
     }
     
-    public Objects3DPopulation findVessel(ImagePlus img, Roi roi) {
+    public ImagePlus thresholdVessel(ImagePlus img, Roi roi) {
         ClearCLBuffer imgCL = clij2.push(img);
         ClearCLBuffer threshold = threshold(imgCL, vesselThMet); 
         clij2.release(imgCL);
@@ -371,9 +362,15 @@ public class Sox_10_Tools {
         imgTh.setRoi(roi);
         IJ.run(imgTh, "Clear Outside", "stack");
         threshold = clij2.push(imgTh);
+        ImagePlus imgFinal = clij2.pull(threshold);
         closeImages(imgTh);
-        Objects3DPopulation vesselPop = getPopFromClearBuffer(threshold, 0, Double.MAX_VALUE);
         clij2.release(threshold);
+        return imgFinal;
+    }
+    
+    public Objects3DPopulation findVessel(ImagePlus imgTh) {
+        ClearCLBuffer threshold = clij2.push(imgTh);
+        Objects3DPopulation vesselPop = getPopFromClearBuffer(threshold, 0, Double.MAX_VALUE);
         System.out.println(vesselPop.getNbObjects()+" vessels found");
         return(vesselPop);
     }
@@ -543,7 +540,7 @@ public class Sox_10_Tools {
         gd.addNumericField("Calibration z (µm)  :", cal.pixelDepth, 3);
         gd.addMessage("Spatial distribution", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Radius for neighboring analysis : ", radiusNei, 2);
-        gd.addNumericField("Number of neighborgs : ", nbNei, 2);
+        gd.addNumericField("Number of neighbors : ", nbNei, 2);
         gd.addCheckbox("Do comparaison to random distribution", false);
         gd.addCheckbox("Compute distance to vessel", false);
         gd.addChoice("Vessel thresholding method :", methods, vesselThMet);
@@ -623,7 +620,7 @@ public class Sox_10_Tools {
        star.run();
        closeImages(imgM);
        // label in 3D
-       ImagePlus nuclei = star.getLabelImagePlus();
+       ImagePlus nuclei = new Duplicator().run(star.getLabelImagePlus());
        nuclei.setRoi(roi);
        roi.setLocation(0, 0);
        IJ.setBackgroundColor(0, 0, 0);
@@ -663,6 +660,7 @@ public class Sox_10_Tools {
         if (vessel) {
             IJ.run(imgCells, "Fire", "");
             IJ.run(imgCells, "Calibrate...", "function=None unit=µm");
+            IJ.run(imgCells, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=1 overlay show");
             IJ.run(imgCells, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=1 overlay show");
         }
         FileSaver ImgObjectsFile = new FileSaver(imgCells);
@@ -1001,5 +999,20 @@ public class Sox_10_Tools {
        outPutResults.close();
        outPutDistances.close();         
        //outPutPlot.close();
+    }
+    
+    public int getPyramidalFactor(ImageProcessorReader reader) {
+        reader.setSeries(0);
+        int sizeXseries0 = reader.getSizeX();
+        reader.setSeries(reader.getSeriesCount()-1);
+        int sizeXseriesN = reader.getSizeX();
+        return (sizeXseries0 / sizeXseriesN); 
+    }
+    
+    public Roi scaleRoi(Roi roi, int scale) {
+        Roi scaledRoi = new RoiScaler().scale(roi, scale, scale, false);
+        Rectangle rect = roi.getBounds();
+        scaledRoi.setLocation(rect.x*scale, rect.y*scale);
+        return scaledRoi;
     }
 }

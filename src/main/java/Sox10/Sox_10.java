@@ -11,6 +11,7 @@ import ij.measure.Calibration;
 import ij.plugin.ImageCalculator;
 import ij.plugin.PlugIn;
 import ij.plugin.RoiScaler;
+import ij.gui.WaitForUserDialog;
 import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
@@ -138,25 +139,27 @@ public class Sox_10 implements PlugIn {
                 // For each roi open cropped image
                 for (Roi roi : rois) {
                     nucIndex++;
-                    Rectangle rectRoi = roi.getBounds();
+                    Roi scaledRoi = sox.scaleRoi(roi, sox.getPyramidalFactor(reader));
+                    Rectangle rectRoi = scaledRoi.getBounds();
                     options.setCropRegion(series, new Region(rectRoi.x, rectRoi.y, rectRoi.width, rectRoi.height));
+                    
                     options.setCBegin(series, channelIndex[2]);
                     options.setCEnd(series, channelIndex[2]); 
                     // cells image
                     ImagePlus imgCells = BF.openImagePlus(options)[0];
                     Objects3DPopulation cellPop = new Objects3DPopulation();
                     if (sox.cellsDetection.equals("DOG"))
-                        cellPop = sox.findCellsDoG(imgCells, roi);
+                        cellPop = sox.findCellsDoG(imgCells, scaledRoi);
                     else
-                        cellPop = sox.stardistNucleiPop(imgCells, roi);
+                        cellPop = sox.stardistNucleiPop(imgCells, scaledRoi);
                     System.out.println(cellPop.getNbObjects()+" cells found");
-                    
+                  
                     // Vessel channel
                     Objects3DPopulation vesselPop = new Objects3DPopulation();
                     ArrayList<Double> dist = new ArrayList<>();
-                    ArrayList<Double> diam = new ArrayList<>();
+                    ArrayList<Double> diam = new ArrayList<>(); 
                     // vessel image
-                    if (sox.vessel){
+                    if (sox.vessel){    
                         options.setCBegin(series, channelIndex[0]);
                         options.setCEnd(series, channelIndex[0]); 
                         ImagePlus imgVessel1 = BF.openImagePlus(options)[0];
@@ -167,18 +170,20 @@ public class Sox_10 implements PlugIn {
                         sox.closeImages(imgVessel1);
                         sox.closeImages(imgVessel2);
                         ImagePlus imgVesselTube = sox.tubeness(imgVessel);
-                        vesselPop = sox.findVessel(imgVesselTube, roi);
+                        ImagePlus imgVesselTh = sox.thresholdVessel(imgVesselTube, scaledRoi);
+                        vesselPop = sox.findVessel(imgVesselTh);
                         dist = sox.findCellVesselDist(cellPop, vesselPop);
-                        ImagePlus imgVesselMap = sox.localThickness3D(imgVesselTube);
+                        ImagePlus imgVesselMap = sox.localThickness3D(imgVesselTh);
                         diam = sox.findVesselDiameter(cellPop, vesselPop, imgVesselMap);
                         sox.closeImages(imgVesselTube);
-                        sox.closeImages(imgVesselMap);
+                        sox.closeImages(imgVesselTh);
+                        sox.closeImages(imgVesselMap);  
                     }
                     
                     sox.saveCellsImage(cellPop, vesselPop, imgCells, dist, outDirResults+rootName+"_"+roi.getName()+".tif");
                                         
                     // find parameters
-                    sox.computeNucParameters(cellPop, vesselPop, dist, diam, imgCells, roi.getName(), roi, rootName, outDirResults);
+                    sox.computeNucParameters(cellPop, vesselPop, dist, diam, imgCells, roi.getName(), scaledRoi, rootName, outDirResults);
                     sox.closeImages(imgCells);
                 }
             }
