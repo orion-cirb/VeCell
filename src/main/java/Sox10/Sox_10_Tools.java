@@ -6,11 +6,13 @@ import features.TubenessProcessor;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.Prefs;
 import ij.gui.Plot;
 import ij.gui.Roi;
 import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
+import ij.plugin.CalibrationBar;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
 import ij.plugin.RoiScaler;
@@ -43,6 +45,8 @@ import loci.plugins.util.ImageProcessorReader;
 import static mcib3d.geom.Object3D_IJUtils.createObject3DVoxels;
 import mcib3d.geom.Point3D;
 import mcib3d.geom.Voxel3D;
+import mcib3d.image3d.ImageFloat;
+import mcib3d.image3d.distanceMap3d.EDT;
 import mcib3d.utils.ArrayUtil;
 import mcib3d.utils.CDFTools;
 import mcib3d.utils.ThreadUtil;
@@ -263,56 +267,35 @@ public class Sox_10_Tools {
      * @param img
      * @return imgMap
     **/
-    public ImagePlus localThickness3D (ImagePlus img) {
-        IJ.run(img, "8-bit", "");
+    public ImageFloat localThickness3D (ImagePlus img, boolean inverse) {
         IJ.showStatus("Computing distance map...");
-        EDT_S1D edt = new EDT_S1D();
-        edt.runSilent = true;
-        edt.thresh = 1;
-        edt.inverse = false;
-        edt.showOptions = false;
-        edt.setup("", img);
-        edt.run(img.getProcessor());
-        ImagePlus imgEDT = edt.getResultImage();
-        imgEDT.setCalibration(cal);
-        Local_Thickness_Parallel locThk = new Local_Thickness_Parallel();
-        locThk.runSilent = true;
-        locThk.setup("", imgEDT);
-        locThk.run(imgEDT.getProcessor());
-        ImagePlus imgLocThk = locThk.getResultImage();
-        imgLocThk.setCalibration(cal);
-        Clean_Up_Local_Thickness cleanUp = new Clean_Up_Local_Thickness();
-        cleanUp.runSilent = true;
-        cleanUp.setup("", imgLocThk);
-        cleanUp.run(imgLocThk.getProcessor());
-        ImagePlus imgMap = cleanUp.getResultImage();
-        imgMap.setCalibration(cal);
-        IJ.run(imgMap, "Multiply...", "value="+cal.pixelWidth+" stack");
-        closeImages(imgEDT);
-        closeImages(imgLocThk);
-        return(imgMap);
+        img.setCalibration(cal);
+        ImageFloat edt = new EDT().run(ImageHandler.wrap(img), 0,inverse, ThreadUtil.getNbCpus());
+        return(edt);
     }
     
+    
     /**
-     * Find cell distance to nearest vessel
+     * Find cell distance to nearest vessel with inverse distance map
      * @param cellPop
      * @param vesselPop
      * @return 
      */
-    public ArrayList<Double> findCellVesselDist(Objects3DPopulation cellPop, Objects3DPopulation vesselPop) {
+    public ArrayList<Double> findCellVesselDist(Objects3DPopulation cellPop, ImagePlus imgVesselBin) {
         ArrayList<Double> cellDist = new ArrayList<>();
+        ImageFloat imgMapInv = localThickness3D(imgVesselBin, true);
         int cellNb = cellPop.getNbObjects();
-        for (int i = 0; i < cellNb; i++) {
-            IJ.showStatus("Finding vessel distance for cell "+i+"/"+cellNb);
-            Object3D cellObj = cellPop.getObject(i);
-            Object3D vesselObj = vesselPop.closestBorder(cellObj);
-            double dist = cellObj.distCenterBorderUnit(vesselObj);
+        for (Object3D cellObj : cellPop.getObjectsList()) {
+            IJ.showStatus("Finding vessel distance for cell "+cellObj.getValue()+"/"+cellNb);
+            Point3D pt = cellObj.getCenterAsPoint();
+            double dist = imgMapInv.getPixel(pt);
             cellDist.add(dist);	
-            cellObj.setName(String.valueOf(dist));
         }
-        cellPop.updateNamesAndValues();
+        imgMapInv.closeImagePlus();
         return(cellDist);
     }
+    
+    
     
     /**
      * Tubeness
@@ -331,25 +314,35 @@ public class Sox_10_Tools {
      /**
      * Find vessel diameter to nearest astrocyte
      * @param astroPop
-     * @param vesselPop
-     * @param imgVesselmap
+     * @param imgVesselBin
      * @return 
      */
-    public ArrayList<Double> findVesselDiameter(Objects3DPopulation astroPop, Objects3DPopulation vesselPop,ImagePlus imgVesselmap) {
-        ArrayList<Double> astroDiam = new ArrayList<>();
+    public ArrayList<Double> findVesselDiameter(Objects3DPopulation astroPop, ImagePlus imgVesselBin) {
+        ArrayList<Double> vesselDiam = new ArrayList<>();
+        // get skeleton
+        ImagePlus imgSkel = new Duplicator().run(imgVesselBin);
+        IJ.setAutoThreshold(imgSkel, "Default dark");
+        Prefs.blackBackground = false;
+        IJ.run(imgSkel, "Convert to Mask", "method=Default background=Dark");
+        IJ.run(imgSkel, "Skeletonize", "stack");
+        ClearCLBuffer skelCL = clij2.push(imgSkel);
+        Objects3DPopulation vesselSkelPop = getPopFromClearBuffer(skelCL, 0, Double.MAX_VALUE);
+        clij2.release(skelCL);
+        ImageFloat imgVesselmap = localThickness3D(imgVesselBin, false);
         int astroNb = astroPop.getNbObjects();
-        for (int i = 0; i < astroPop.getNbObjects(); i++) {
-            IJ.showStatus("Finding vessel diameter for cell "+i+"/"+astroNb);
-            Object3D astroObj = astroPop.getObject(i);
-            Object3D vesselObj = vesselPop.closestBorder(astroObj);
-            
+        imgVesselmap.show();
+        for (Object3D astroObj : astroPop.getObjectsList()) {
+            IJ.showStatus("Finding vessel diameter for cell "+astroObj.getValue()+"/"+astroNb);
+            Object3D vesselObj = vesselSkelPop.closestBorder(astroObj);
             Voxel3D[] ptsBorder = astroObj.VoxelsBorderBorder(vesselObj);
             Point3D ptBorder = ptsBorder[1];
+            double diam = imgVesselmap.getPixel(ptBorder);
+            System.out.println(ptBorder.x+","+ptBorder.y+","+ptBorder.z+","+diam);
             
-            double diam = imgVesselmap.getImageStack().getVoxel((int)ptBorder.x, (int)ptBorder.y, (int)(ptBorder.z+1.00));
-            astroDiam.add(diam);
+            vesselDiam.add(diam);
         }
-        return(astroDiam);
+        closeImages(imgSkel);
+        return(vesselDiam);
     }
     
     public ImagePlus thresholdVessel(ImagePlus img, Roi roi) {
@@ -365,6 +358,7 @@ public class Sox_10_Tools {
         ImagePlus imgFinal = clij2.pull(threshold);
         closeImages(imgTh);
         clij2.release(threshold);
+        imgFinal.setCalibration(cal);
         return imgFinal;
     }
     
@@ -486,15 +480,15 @@ public class Sox_10_Tools {
         FileWriter fileResults = new FileWriter(outDirResults +"Results.xls", false);
         outPutResults = new BufferedWriter(fileResults);
         outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
-                + "Cell mean volume\t Cell sd volume\ttotal Volume\tAverage Distance To Closest Neighbor\tSD DistanceTo Closest Neighbor"
-                + "\tMean Of Average Distance of "+nbNei+" neighbors"+"\tSD Of Average Distance of "+nbNei+" neighbors"+"\tMean Of Max Distance of "+nbNei+" neighbors"+
-                "\tSD Of Max Distance of "+nbNei+" neighbors\tArea Curves\tDistribution Aleatoire Stat\tMean distance to Vessel\tMean Vessel diameter\n");
+                + "Cell mean volume\t Cell sd volume\ttotal cell Volume\tCell average Distance To Closest Neighbor\tCell SD DistanceTo Closest Neighbor"
+                + "\tCell Mean Of Average Distance of "+nbNei+" neighbors"+"\tCell SD Of Average Distance of "+nbNei+" neighbors"+"\tCell Mean Of Max Distance of "+nbNei+" neighbors"+
+                "\tCell SD Of Max Distance of "+nbNei+" neighbors\tCell Area Curves\tCell Distribution Aleatoire Stat\tCell Mean distance to Vessel\tMean Vessel diameter\n");
         outPutResults.flush();
 
         // distances results
         FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
         outPutDistances = new BufferedWriter(fileDistances);
-        outPutDistances.write("Image name\tRoi name\tCell Volume\tDistance To Closest Neighbor\tDistance to Closest Vessel \n");
+        outPutDistances.write("Image name\tRoi name\tCell Volume\tCell Distance To Closest Neighbor\tCell Distance to Closest Vessel\tClosest Vessel diameter\n");
         outPutDistances.flush();
     }
     
@@ -642,8 +636,8 @@ public class Sox_10_Tools {
      */
     public void saveCellsImage(Objects3DPopulation cellPop, Objects3DPopulation vesselPop, ImagePlus img, ArrayList<Double> dists, String pathName) {
         ImageHandler imhCell = ImageHandler.wrap(img).createSameDimensions();
+        double maxDist = Collections.max(dists);
         if (vessel) {
-            double maxDist = Collections.max(dists);
             for (int i = 0; i < cellPop.getNbObjects(); i++) {
                 Object3D obj = cellPop.getObject(i);
                 double dist = dists.get(i);
@@ -659,10 +653,10 @@ public class Sox_10_Tools {
         imgCells.setCalibration(cal);
         if (vessel) {
             IJ.run(imgCells, "Fire", "");
-            IJ.run(imgCells, "Calibrate...", "function=None unit=µm");
-            IJ.run(imgCells, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=1 overlay show");
+            IJ.run(imgCells,"Calibrate...","function=None unit="+cal.getUnit());
             IJ.run(imgCells, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=1 overlay show");
         }
+
         FileSaver ImgObjectsFile = new FileSaver(imgCells);
         ImgObjectsFile.saveAsTiff(pathName); 
         closeImages(imgCells);
@@ -927,8 +921,6 @@ public class Sox_10_Tools {
         DescriptiveStatistics cellVolume = new DescriptiveStatistics();
         DescriptiveStatistics cellNbNeighborsDistMean = new DescriptiveStatistics();
         DescriptiveStatistics cellNbNeighborsDistMax = new DescriptiveStatistics();
-        DescriptiveStatistics cellVesselNbNeighborsDistMean = new DescriptiveStatistics();
-        DescriptiveStatistics cellVesselNbNeighborsDistMax = new DescriptiveStatistics();
         double cellVolumeSum = 0.0;
         // do individual stats
         cellPop.createKDTreeCenters();
@@ -941,11 +933,12 @@ public class Sox_10_Tools {
             cellVolume.addValue(cellObj.getVolumeUnit());
             cellVolumeSum += cellObj.getVolumeUnit();
             double vesselDist = Double.NaN;
+             double vesselDiam = Double.NaN;
             if (vessel) {
                 Object3D vesselObj = vesselPop.closestBorder(cellObj);
-                vesselDist = cellObj.distBorderUnit(vesselObj);
-                getDistNeighbors(cellObj, vesselPop, cellVesselNbNeighborsDistMean, cellVesselNbNeighborsDistMax);
-                outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+vesselDist+"\n");
+                vesselDist = dist.get(i);
+                vesselDiam = diam.get(i);
+                outPutDistances.write(imgName+"\t"+roiName+"\t"+cellObj.getVolumeUnit()+"\t"+alldistances.getValue(i)+"\t"+vesselDist+"\t"+vesselDiam+"\n");
                 outPutDistances.flush();
             }
             else {
@@ -981,15 +974,10 @@ public class Sox_10_Tools {
         double neiMeanSD = cellNbNeighborsDistMean.getStandardDeviation();
         double neiMaxMean = cellNbNeighborsDistMax.getMean();
         double neiMaxSD = cellNbNeighborsDistMax.getStandardDeviation();
-        double neiVesselMeanMean = cellVesselNbNeighborsDistMean.getMean();
-        double neiVesselMeanSD = cellVesselNbNeighborsDistMean.getStandardDeviation();
-        double neiVesselMaxMean = cellVesselNbNeighborsDistMax.getMean();
-        double neiVesselMaxSD = cellVesselNbNeighborsDistMax.getStandardDeviation();
-        
+       
         outPutResults.write(imgName+"\t"+roiName+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellIntMean+"\t"+cellIntSD+"\t"+cellVolumeMean+"\t"+
                 cellVolumeSD+"\t"+cellVolumeSum+"\t"+minDistCenterMean+"\t"+minDistCenterSD+"\t"+neiMeanMean+"\t"+neiMeanSD+"\t"+neiMaxMean+"\t"+neiMaxSD
-                +"\t"+areaCurves+"\t"+sdiF+"\t"+vesselDistMean+"\t"+vesselDiamMean+"\t"+neiVesselMeanMean+"\t"+neiVesselMeanSD+"\t"+neiVesselMaxMean
-                +"\t"+neiVesselMaxSD+"\n");
+                +"\t"+areaCurves+"\t"+sdiF+"\t"+vesselDistMean+"\t"+vesselDiamMean+"\n");
         
         outPutResults.flush();
     }

@@ -33,6 +33,7 @@ import loci.plugins.BF;
 import loci.plugins.in.ImporterOptions;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom.Objects3DPopulation;
+import mcib3d.image3d.ImageFloat;
 import org.apache.commons.io.FilenameUtils;
 
 
@@ -172,12 +173,10 @@ public class Sox_10 implements PlugIn {
                         ImagePlus imgVesselTube = sox.tubeness(imgVessel);
                         ImagePlus imgVesselTh = sox.thresholdVessel(imgVesselTube, scaledRoi);
                         vesselPop = sox.findVessel(imgVesselTh);
-                        dist = sox.findCellVesselDist(cellPop, vesselPop);
-                        ImagePlus imgVesselMap = sox.localThickness3D(imgVesselTh);
-                        diam = sox.findVesselDiameter(cellPop, vesselPop, imgVesselMap);
+                        dist = sox.findCellVesselDist(cellPop, imgVesselTh);
+                        diam = sox.findVesselDiameter(cellPop, imgVesselTh);
                         sox.closeImages(imgVesselTube);
                         sox.closeImages(imgVesselTh);
-                        sox.closeImages(imgVesselMap);  
                     }
                     
                     sox.saveCellsImage(cellPop, vesselPop, imgCells, dist, outDirResults+rootName+"_"+roi.getName()+".tif");
