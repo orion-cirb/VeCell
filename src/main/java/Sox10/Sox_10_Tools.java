@@ -330,15 +330,12 @@ public class Sox_10_Tools {
         clij2.release(skelCL);
         ImageFloat imgVesselmap = localThickness3D(imgVesselBin, false);
         int astroNb = astroPop.getNbObjects();
-        imgVesselmap.show();
         for (Object3D astroObj : astroPop.getObjectsList()) {
             IJ.showStatus("Finding vessel diameter for cell "+astroObj.getValue()+"/"+astroNb);
             Object3D vesselObj = vesselSkelPop.closestBorder(astroObj);
             Voxel3D[] ptsBorder = astroObj.VoxelsBorderBorder(vesselObj);
             Point3D ptBorder = ptsBorder[1];
-            double diam = imgVesselmap.getPixel(ptBorder);
-            System.out.println(ptBorder.x+","+ptBorder.y+","+ptBorder.z+","+diam);
-            
+            double diam = imgVesselmap.getPixel(ptBorder);            
             vesselDiam.add(diam);
         }
         closeImages(imgSkel);
@@ -482,13 +479,13 @@ public class Sox_10_Tools {
         outPutResults.write("Image name\tRoi name\tRoi volume\tNb Cell\tCell mean intensity\tCell sd intensity\t"
                 + "Cell mean volume\t Cell sd volume\ttotal cell Volume\tCell average Distance To Closest Neighbor\tCell SD DistanceTo Closest Neighbor"
                 + "\tCell Mean Of Average Distance of "+nbNei+" neighbors"+"\tCell SD Of Average Distance of "+nbNei+" neighbors"+"\tCell Mean Of Max Distance of "+nbNei+" neighbors"+
-                "\tCell SD Of Max Distance of "+nbNei+" neighbors\tCell Area Curves\tCell Distribution Aleatoire Stat\tCell Mean distance to Vessel\tMean Vessel diameter\n");
+                "\tCell SD Of Max Distance of "+nbNei+" neighbors\tCell Area Curves\tCell Distribution Aleatoire Stat\tCell Mean distance to Vessel\tMean Vessel radius\n");
         outPutResults.flush();
 
         // distances results
         FileWriter fileDistances = new FileWriter(outDirResults +"Distances.xls", false);
         outPutDistances = new BufferedWriter(fileDistances);
-        outPutDistances.write("Image name\tRoi name\tCell Volume\tCell Distance To Closest Neighbor\tCell Distance to Closest Vessel\tClosest Vessel diameter\n");
+        outPutDistances.write("Image name\tRoi name\tCell Volume\tCell Distance To Closest Neighbor\tCell Distance to Closest Vessel\tClosest Vessel radius\n");
         outPutDistances.flush();
     }
     
@@ -636,8 +633,8 @@ public class Sox_10_Tools {
      */
     public void saveCellsImage(Objects3DPopulation cellPop, Objects3DPopulation vesselPop, ImagePlus img, ArrayList<Double> dists, String pathName) {
         ImageHandler imhCell = ImageHandler.wrap(img).createSameDimensions();
-        double maxDist = Collections.max(dists);
         if (vessel) {
+            double maxDist = Collections.max(dists);
             for (int i = 0; i < cellPop.getNbObjects(); i++) {
                 Object3D obj = cellPop.getObject(i);
                 double dist = dists.get(i);
