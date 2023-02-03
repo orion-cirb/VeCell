@@ -24,7 +24,9 @@ In each ROI:
 * Compute the distance between each cell and its neighbors
 * Compute the G-function related spatial distribution index of the population of cells
 * Detect vessels with a Median filtering + DoG filtering + thresholding + Median filtering
-* Compute the distance between each cell and its nearest vessel and compute the radius of the corresponding vessel
+* Compute the vessels skeleton, distance map and inverse distance map
+* Get the distance between each cell and its nearest vessel using the inverse distance map
+* Compute the radius of the corresponding vessels using the vessels skeleton and distance map
 * Give cells volume and intensity
 
 ### Dependencies
