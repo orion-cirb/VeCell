@@ -1,6 +1,6 @@
 # Sox_10
 
-* **Developed for:** Katia
+* **Developed for:** Naomie
 * **Team:** Cohen-Salmon
 * **Date:** February 2023
 * **Software:** Fiji
