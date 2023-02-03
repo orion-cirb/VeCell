@@ -19,13 +19,13 @@ A *.roi* or *.zip* file containing ROI(s) must be provided with each image.
 
 ### Plugin description
 
-* Detect vessels with a Median filtering + DoG filtering + thresholding + Median filtering
+In each ROI:
 * Detect cells with Cellpose
-* Compute each cell distance to nearest vessel
-Keep Th cells colocalizing with a nucleus only
-* Measure ORF1p intensity in the nucleus and the cytoplasm of each Th cell
-* Measure ORF1p intensity in Th-negative nuclei
-
+* Compute the distance between each cell and its neighboring cells
+* Compute the G-function related spatial distribution index of the population of cells
+* Detect vessels with a Median filtering + DoG filtering + thresholding + Median filtering
+* Compute the distance between each cell and its nearest vessel and compute the radius of the corresponding vessel
+* Give cells volume and intensity
 
 ### Dependencies
 
