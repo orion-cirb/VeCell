@@ -21,7 +21,7 @@ A *.roi* or *.zip* file containing ROI(s) must be provided with each image.
 
 In each ROI:
 * Detect cells with Cellpose
-* Compute the distance between each cell and its neighboring cells
+* Compute the distance between each cell and its neighbors
 * Compute the G-function related spatial distribution index of the population of cells
 * Detect vessels with a Median filtering + DoG filtering + thresholding + Median filtering
 * Compute the distance between each cell and its nearest vessel and compute the radius of the corresponding vessel
