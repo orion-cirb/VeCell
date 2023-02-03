@@ -7,11 +7,9 @@
         
 	<groupId>cirb</groupId>
 	<artifactId>Sox_10</artifactId>
-	<version>1.0.0</version>
+	<version>2.0.0</version>
         <packaging>jar</packaging>
 	<name>plugins/CIRB/Sox_10.jar</name>
-	<description>Analyze sox10 cells 
-        </description>
 
 	<developers>
             <developer>
@@ -26,9 +24,9 @@
                 <timezone>-1</timezone>
             </developer>
             <developer>
-                <id>gaelle</id>
-                <name>Gaelle Letort</name>
-                <email>gaelle.letort@college-de-france.fr</email>
+                <id>hm</id>
+                <name>Héloïse Monnet</name>
+                <email>heloise.monnet@college-de-france.fr</email>
                 <url></url>
                 <organization>CIRB, Collège de France</organization>
                 <roles>
@@ -46,20 +44,12 @@
 	</scm>
 
 	<properties>
-            <imagej.app.directory>/opt/Fiji.app/</imagej.app.directory> 
+            <imagej.app.directory>/opt/Fiji.app/</imagej.app.directory>
             <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
             <main-class>Sox_10.jar</main-class>
 	</properties>
 
 	<dependencies>
-                    <!-- Clipper -->
-            <dependency>
-                <groupId>de.lighti</groupId>
-                <artifactId>Clipper</artifactId>
-                <version>6.4.2</version>
-                <scope>system</scope>
-                <systemPath>${basedir}/lib/Clipper-6.4.2.jar</systemPath>
-            </dependency>
             <dependency>
                 <groupId>de.csbdresden</groupId>
                 <artifactId>csbdeep</artifactId>
@@ -79,12 +69,12 @@
             </dependency>
             
             <dependency>
-		<groupId>org.framagit.mcib3d</groupId>
-		<artifactId>mcib3d-core</artifactId>
-		<version>4.0.87</version>		
+                <groupId>mcib</groupId>
+                <artifactId>mcib3d-core</artifactId>
+                <version>4.0.93</version>
+                <type>jar</type>
             </dependency>
 
-            
             <dependency>
                     <groupId>ome</groupId>
                     <artifactId>formats-common</artifactId>
@@ -127,6 +117,12 @@
 	  <groupId>org.framagit.mcib3d</groupId>
 	  <artifactId>mcib3d-plugins</artifactId>
 	  <version>4.0.63</version>
+	  <type>jar</type>
+	 </dependency>
+	 <dependency>
+	  <groupId>de.lighti</groupId>
+	  <artifactId>Clipper</artifactId>
+	  <version>6.4.2</version>
 	  <type>jar</type>
 	 </dependency>
 	</dependencies>
