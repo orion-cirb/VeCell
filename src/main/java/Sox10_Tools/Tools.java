@@ -358,11 +358,15 @@ public class Tools {
      * Get scaling factor
      */
     public int getPyramidalFactor(ImageProcessorReader reader) {
-        reader.setSeries(0);
-        int sizeXseries0 = reader.getSizeX();
-        reader.setSeries(reader.getSeriesCount()-1);
-        int sizeXseriesN = reader.getSizeX();
-        return (sizeXseries0 / sizeXseriesN); 
+        if(reader.getSeriesCount() == 1) {
+            return(1);
+        } else {
+            reader.setSeries(0);
+            int sizeXseries0 = reader.getSizeX();
+            reader.setSeries(2);
+            int sizeXseries2 = reader.getSizeX();
+            return (sizeXseries0 / sizeXseries2);
+        }
     }
     
     

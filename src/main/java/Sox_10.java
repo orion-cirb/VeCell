@@ -112,17 +112,14 @@ public class Sox_10 implements PlugIn {
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
                 options.setCrop(true);
                 
-                // If Zeiss pyramidal image, take first serie
-                int nSeries = reader.getSeriesCount() - 1;
-                if (fileExt.equals("czi")) nSeries = 0;
-                
                 // Compute pyramidal factor
+                int series = 0;
                 int pyramidalFactor = tools.getPyramidalFactor(reader);
                
                 // Cells channel
                 tools.print("Opening cells channel...");
-                options.setCBegin(nSeries, channelIndex[2]);
-                options.setCEnd(nSeries, channelIndex[2]);
+                options.setCBegin(series, channelIndex[2]);
+                options.setCEnd(series, channelIndex[2]);
                 ImagePlus imgCells = BF.openImagePlus(options)[0];
                 tools.print("Detecting cells...");
                 ImagePlus cellsDetection = tools.cellposeDetection(imgCells);
@@ -135,12 +132,12 @@ public class Sox_10 implements PlugIn {
                 ImagePlus vesselsSkel = null;
                 if (tools.vessel){
                     tools.print("Opening vessels channels...");
-                    options.setCBegin(nSeries, channelIndex[0]);
-                    options.setCEnd(nSeries, channelIndex[0]); 
+                    options.setCBegin(series, channelIndex[0]);
+                    options.setCEnd(series, channelIndex[0]); 
                     ImagePlus imgVessel1 = BF.openImagePlus(options)[0];
                     
-                    options.setCBegin(nSeries, channelIndex[1]);
-                    options.setCEnd(nSeries, channelIndex[1]);
+                    options.setCBegin(series, channelIndex[1]);
+                    options.setCEnd(series, channelIndex[1]);
                     ImagePlus imgVessel2 = BF.openImagePlus(options)[0];
                     
                     imgVessel =  new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
@@ -192,11 +189,13 @@ public class Sox_10 implements PlugIn {
                 
                 tools.closeImage(imgCells);
                 tools.closeImage(cellsDetection);
-                tools.closeImage(imgVessel);
-                tools.closeImage(vesselsDetection);
-                tools.closeImage(vesselsDistMap.getImagePlus());
-                tools.closeImage(vesselsDistMapInv.getImagePlus());
-                tools.closeImage(vesselsSkel);
+                if (tools.vessel){
+                    tools.closeImage(imgVessel);
+                    tools.closeImage(vesselsDetection);
+                    tools.closeImage(vesselsDistMap.getImagePlus());
+                    tools.closeImage(vesselsDistMapInv.getImagePlus());
+                    tools.closeImage(vesselsSkel);
+                }
             }
             
             tools.closeResults();
