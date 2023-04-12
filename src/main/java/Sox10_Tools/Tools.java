@@ -635,7 +635,7 @@ public class Tools {
             Point3D pt = new MeasureCentroid​(cellObj).getCentroidAsPoint();
             vesselDistMapInv.setZ(pt.getRoundZ());
             ImageProcessor ip = vesselDistMapInv.getProcessor();
-            double dist = ip.getPixelValue(pt.getRoundX(), pt.getRoundY())*cal.pixelWidth;
+            double dist = ip.getPixelValue(pt.getRoundX(), pt.getRoundY());
             cellDist.add(dist);	
         }
         return(cellDist);
@@ -651,7 +651,7 @@ public class Tools {
             VoxelInt voxelBorder = new Measure2Distance(cellObj, vesselSkel).getBorder2Pix();
             vesselDistMap.setZ(voxelBorder.getZ());
             ImageProcessor ip = vesselDistMap.getProcessor();
-            double radius = ip.getPixelValue(voxelBorder.getX(), voxelBorder.getY())*cal.pixelWidth;
+            double radius = ip.getPixelValue(voxelBorder.getX(), voxelBorder.getY());
             vesselRadius.add(radius);
         }
         return(vesselRadius);
