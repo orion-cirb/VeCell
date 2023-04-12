@@ -125,6 +125,12 @@
 	  <version>0.6.0.1</version>
 	  <type>jar</type>
 	 </dependency>
+	 <dependency>
+	  <groupId>net.haesleinhuepf</groupId>
+	  <artifactId>clijx-assistant-bonej_</artifactId>
+	  <version>0.6.0.1</version>
+	  <type>jar</type>
+	 </dependency>
 	</dependencies>
         <repositories>
             <repository>

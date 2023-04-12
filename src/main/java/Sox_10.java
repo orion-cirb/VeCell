@@ -138,7 +138,7 @@ public class Sox_10 implements PlugIn {
                     tools.print("Detecting vessels...");
                     vesselsDetection = tools.vesselsDetection(imgVessel, pyramidalFactor);
                     tools.print("Computing vessels skeleton...");
-                    vesselsSkel = tools.vesselsSkeletonization(vesselsDetection);
+                    vesselsSkel = tools.vesselsSkeletonize3D(vesselsDetection);
                     tools.print("Computing vessels distance maps...");
                     vesselsDistMap = tools.localThickness3D(vesselsDetection, false);
                     vesselsDistMapInv = tools.localThickness3D(vesselsDetection, true);
@@ -184,7 +184,6 @@ public class Sox_10 implements PlugIn {
                     tools.drawResults(cellPop, vesselPop, imgCells, imgVessel, dist, outDirResults+rootName+"_"+roi.getName());        
                     tools.print("Writing results...");
                     tools.writeResults(cellPop, vesselPop, dist, radius, imgCells, roi.getName(), scaledRoi, rootName, outDirResults);
-                    tools.closeImage(imgVessel);
                 }
                 
                 tools.closeImage(imgCells);

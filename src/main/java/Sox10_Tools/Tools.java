@@ -9,6 +9,7 @@ import ij.ImageStack;
 import ij.gui.Plot;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
+import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.measure.ResultsTable;
@@ -48,16 +49,19 @@ import mcib3d.geom2.measurements.MeasureIntensity;
 import mcib3d.geom2.measurements.MeasureVolume;
 import mcib3d.geom2.measurementsPopulation.MeasurePopulationDistance;
 import mcib3d.geom2.measurementsPopulation.PairObjects3DInt;
+import mcib3d.image3d.ImageFloat;
 import mcib3d.image3d.ImageInt;
 import mcib3d.image3d.ImageLabeller;
+import mcib3d.image3d.distanceMap3d.EDT;
 import mcib3d.spatial.descriptors.G_Function;
 import mcib3d.spatial.descriptors.SpatialDescriptor;
 import mcib3d.spatial.sampler.SpatialModel;
 import mcib3d.spatial.sampler.SpatialRandomHardCore;
+import mcib3d.utils.ThreadUtil;
 import net.haesleinhuepf.clij.clearcl.ClearCLBuffer;
 import net.haesleinhuepf.clij2.CLIJ2;
+import net.haesleinhuepf.clijx.bonej.BoneJSkeletonize3D;
 import net.haesleinhuepf.clijx.imagej2.ImageJ2Tubeness;
-import net.haesleinhuepf.clijx.plugins.Skeletonize;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -548,73 +552,46 @@ public class Tools {
         pop.resetLabels();
     }
     
-     /**
+
+    
+    /**
      * Compute distance map or inverse distance map
-     * with clij2
      */
     public ImagePlus localThickness3D(ImagePlus img, boolean inverse) {
         IJ.showStatus("Computing distance map...");
-        ImagePlus imgDup = new Duplicator().run(img);
-        IJ.run(imgDup, "8-bit", "");
-        if (inverse)
-            IJ.run(imgDup, "Invert", "stack");
-        ClearCLBuffer imgCL = clij2.push(imgDup);
-        closeImage(imgDup);
-        ClearCLBuffer imgCLMap = clij2.create(imgCL);
-        clij2.distanceMap(imgCL, imgCLMap);
-        clij2.release(imgCL);
-        ImagePlus imgMap = clij2.pull(imgCLMap);
-        clij2.release(imgCLMap);
-        imgMap.setCalibration(cal);
-        return(imgMap);
+        img.setCalibration(cal);
+        ImageFloat edt = new EDT().run(ImageHandler.wrap(img), 0, inverse, ThreadUtil.getNbCpus());
+        return(edt.getImagePlus());
     }
     
-//    /**
-//     * Compute distance map or inverse distance map
-//     */
-//    public ImageFloat localThickness3D(ImagePlus img, boolean inverse) {
-//        IJ.showStatus("Computing distance map...");
-//        img.setCalibration(cal);
-//        ImageFloat edt = new EDT().run(ImageHandler.wrap(img), 0, inverse, ThreadUtil.getNbCpus());
-//        return(edt);
-//    }
-    
-    /**
-     * Clij2 skeletonize 2D over stack
-     * @param img
-     * @return 
+     /**
+     * Clij2 skeletonize 3D
      */
-    public ImagePlus vesselsSkeletonization(ImagePlus img) {
-        PrintStream console = System.out;
-        System.out.println("Computing skeleton ...");
-        System.setOut(new NullPrintStream());
-        ImageStack imgS = new ImageStack(img.getWidth(), img.getHeight());
-        for (int z = 1; z <= img.getNSlices(); z ++) {
-            ImagePlus imgZ = new Duplicator().run(img, z, z);
-            ClearCLBuffer imgCL = clij2.push(imgZ);
-            ClearCLBuffer imgCLSkel = clij2.create(imgCL);
-            Skeletonize.skeletonize(clij2, imgCL, imgCLSkel);
-            clij2.release(imgCL);
-            imgS.addSlice(clij2.pull(imgCLSkel).getProcessor());
-            clij2.release(imgCLSkel);
-            closeImage(imgZ);
-        } 
-        System.setOut(console);
-        ImagePlus imgSkel = new ImagePlus("", imgS);
+    public ImagePlus vesselsSkeletonize3D(ImagePlus img) {
+        ClearCLBuffer imgCL = clij2.push(img);
+        ClearCLBuffer imgCLSkel = clij2.create(imgCL);
+        BoneJSkeletonize3D skel = new BoneJSkeletonize3D();
+        skel.bonejSkeletonize3D(clij2,imgCL, imgCLSkel);
+        clij2.release(imgCL);
+        ImagePlus imgSkel = clij2.pull(imgCLSkel);
+        clij2.release(imgCLSkel);
         return(imgSkel);
     }
+
+    
     
     /**
      * Compute vessels skeleton
      */
-//   public ImagePlus vesselsSkeletonization(ImagePlus img) {
-//        ImagePlus imgSkel = new Duplicator().run(imgTh);
-//        IJ.run(imgSkel, "8-bit", "");
-//        IJ.run(imgSkel, "Invert LUT", "stack");
-//        IJ.run(imgSkel, "Skeletonize (2D/3D)", "");
-//        IJ.run(imgSkel, "Invert LUT", "stack");
-//        return(imgSkel);
-//    }
+   public void vesselsSkeletonization2(ImagePlus img) {
+        ImagePlus imgSkel = new Duplicator().run(img);
+        IJ.run(imgSkel, "8-bit", "");
+        IJ.run(imgSkel, "Invert LUT", "stack");
+        IJ.run(imgSkel, "Skeletonize (2D/3D)", "");
+        IJ.run(imgSkel, "Invert LUT", "stack");
+        imgSkel.show("skelOld");
+        new WaitForUserDialog("skelOld").show();
+    }
     
     
     /**
@@ -703,7 +680,7 @@ public class Tools {
             int i = 0;
             for (Object3DInt cell : cellPop.getObjects3DInt()) {
                 double dist = dists.get(i);
-                cell.drawObject(imhCellDist, (float)dist); 
+                cell.drawObject(imhCellDist, (dist == 0) ? 255 : (float)dist); 
                 i++;
             }
             ImagePlus imgCellDist = imhCellDist.getImagePlus();
