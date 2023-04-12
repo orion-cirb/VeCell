@@ -7,7 +7,7 @@
         
 	<groupId>cirb</groupId>
 	<artifactId>Sox_10</artifactId>
-	<version>2.0.0</version>
+	<version>3.0.0</version>
         <packaging>jar</packaging>
 	<name>plugins/CIRB/Sox_10.jar</name>
 
@@ -92,7 +92,7 @@
             <dependency>
                   <groupId>net.haesleinhuepf</groupId>
                   <artifactId>clij2_</artifactId>
-                  <version>2.5.1.4</version>
+                  <version>2.5.3.1</version>
                   <type>jar</type>
             </dependency>
             <dependency>
@@ -120,9 +120,9 @@
 	  <type>jar</type>
 	 </dependency>
 	 <dependency>
-	  <groupId>de.lighti</groupId>
-	  <artifactId>Clipper</artifactId>
-	  <version>6.4.2</version>
+	  <groupId>net.haesleinhuepf</groupId>
+	  <artifactId>clijx-assistant-imagej2_</artifactId>
+	  <version>0.6.0.1</version>
 	  <type>jar</type>
 	 </dependency>
 	</dependencies>

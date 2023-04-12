@@ -25,7 +25,6 @@ import loci.plugins.in.ImporterOptions;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom2.Object3DInt;
 import mcib3d.geom2.Objects3DIntPopulation;
-import mcib3d.image3d.ImageFloat;
 import org.apache.commons.io.FilenameUtils;
 
 
@@ -115,20 +114,12 @@ public class Sox_10 implements PlugIn {
                 // Compute pyramidal factor
                 int series = 0;
                 int pyramidalFactor = tools.getPyramidalFactor(reader);
-               
-                // Cells channel
-                tools.print("Opening cells channel...");
-                options.setCBegin(series, channelIndex[2]);
-                options.setCEnd(series, channelIndex[2]);
-                ImagePlus imgCells = BF.openImagePlus(options)[0];
-                tools.print("Detecting cells...");
-                ImagePlus cellsDetection = tools.cellposeDetection(imgCells);
                 
                 // Vessels channel
                 ImagePlus imgVessel = null;
                 ImagePlus vesselsDetection = null;
-                ImageFloat vesselsDistMap = null;
-                ImageFloat vesselsDistMapInv = null;
+                ImagePlus vesselsDistMap = null;
+                ImagePlus vesselsDistMapInv = null;
                 ImagePlus vesselsSkel = null;
                 if (tools.vessel){
                     tools.print("Opening vessels channels...");
@@ -139,22 +130,29 @@ public class Sox_10 implements PlugIn {
                     options.setCBegin(series, channelIndex[1]);
                     options.setCEnd(series, channelIndex[1]);
                     ImagePlus imgVessel2 = BF.openImagePlus(options)[0];
-                    
+                    // Add two vessels chanels
                     imgVessel =  new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
+                    tools.closeImage(imgVessel1);
+                    tools.closeImage(imgVessel2);
                     
                     tools.print("Detecting vessels...");
-                    vesselsDetection = tools.vesselsDetection(imgVessel);
-                    
+                    vesselsDetection = tools.vesselsDetection(imgVessel, pyramidalFactor);
+                    tools.print("Computing vessels skeleton...");
+                    vesselsSkel = tools.vesselsSkeletonization(vesselsDetection);
                     tools.print("Computing vessels distance maps...");
                     vesselsDistMap = tools.localThickness3D(vesselsDetection, false);
                     vesselsDistMapInv = tools.localThickness3D(vesselsDetection, true);
-                    
-                    tools.print("Computing vessels skeleton...");
-                    vesselsSkel = tools.vesselsSkeletonization(vesselsDetection);
-
-                    tools.closeImage(imgVessel1);
-                    tools.closeImage(imgVessel2);
                 }
+                 // Cells channel
+                tools.print("Opening cells channel...");
+                options.setCBegin(series, channelIndex[2]);
+                options.setCEnd(series, channelIndex[2]);
+                ImagePlus imgCellsOrg = BF.openImagePlus(options)[0];
+                // if vessels exist remove vessel in image cells 
+                ImagePlus imgCells = (tools.vessel) ?  new ImageCalculator().run("subtract stack create", imgCellsOrg, imgVessel) : imgCellsOrg;
+                tools.closeImage(imgCellsOrg);
+                tools.print("Detecting cells...");
+                ImagePlus cellsDetection = tools.cellposeDetection(imgCells);
                 
                 // For each roi, open cropped image
                 for (Roi roi : rois) {
@@ -164,12 +162,13 @@ public class Sox_10 implements PlugIn {
 
                     // Cells channel
                     Objects3DIntPopulation cellPop = tools.getCellsInRoi(cellsDetection, imgCells, scaledRoi);
-                    System.out.println(cellPop.getNbObjects() + " cells found in ROI");
-                  
+                    System.out.println(cellPop.getNbObjects() + " cells found in ROI "+scaledRoi.getName());
+                    tools.closeImage(cellsDetection);
+                    
                     // Vessels channel
                     Objects3DIntPopulation vesselPop = new Objects3DIntPopulation();
-                    ArrayList<Double> dist = new ArrayList<Double>();
-                    ArrayList<Double> radius = new ArrayList<Double>();
+                    ArrayList<Double> dist = new ArrayList<>();
+                    ArrayList<Double> radius = new ArrayList<>();
                     if (tools.vessel){
                         vesselPop = tools.getVesselsInRoi(vesselsDetection, scaledRoi);
                         Object3DInt vesselsSkelObj = tools.getVesselsSkelInRoi(vesselsSkel, scaledRoi);
@@ -185,15 +184,16 @@ public class Sox_10 implements PlugIn {
                     tools.drawResults(cellPop, vesselPop, imgCells, imgVessel, dist, outDirResults+rootName+"_"+roi.getName());        
                     tools.print("Writing results...");
                     tools.writeResults(cellPop, vesselPop, dist, radius, imgCells, roi.getName(), scaledRoi, rootName, outDirResults);
+                    tools.closeImage(imgVessel);
                 }
                 
                 tools.closeImage(imgCells);
-                tools.closeImage(cellsDetection);
+                
                 if (tools.vessel){
                     tools.closeImage(imgVessel);
                     tools.closeImage(vesselsDetection);
-                    tools.closeImage(vesselsDistMap.getImagePlus());
-                    tools.closeImage(vesselsDistMapInv.getImagePlus());
+                    tools.closeImage(vesselsDistMap);
+                    tools.closeImage(vesselsDistMapInv);
                     tools.closeImage(vesselsSkel);
                 }
             }

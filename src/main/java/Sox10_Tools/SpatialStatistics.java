@@ -220,6 +220,16 @@ public class SpatialStatistics {
         }
         return sdi;
     }
+    
+    public double getAreaCurve() {
+        double sum = 0.0;
+        for(int i = 0; i < obsDesc.size() - 1; i++){
+            sum += (obsDesc.getValue(i + 1) - obsDesc.getValue(i)) * obsCD.getValue(i);
+            sum += (obsDesc.getValue(i + 1)- obsDesc.getValue(i)) * (obsCD.getValue(i + 1) - obsCD.getValue(i)) / 2.0;
+        }
+        return sum;
+    }
+
 
     public Plot getPlot() {
         if (plot == null) {
