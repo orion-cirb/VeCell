@@ -689,7 +689,8 @@ public class Tools {
             //IJ.run(imgCellDist, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=5 overlay show");
             
             ImageHandler imhVessel = imhCellDist.createSameDimensions();
-            vesselPop.drawInImage(imhVessel);
+            for (Object3DInt ob : vesselPop.getObjects3DInt()) 
+                ob.drawObject(imhVessel, 64);
             
             ImagePlus[] imgColors2 = {imgCellDist, null, imhVessel.getImagePlus(), imgVessel};
             ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, true);
@@ -799,17 +800,16 @@ public class Tools {
             double minDist = Math.pow(3*minCellVol/(4*Math.PI*pixelVol), 1/3) * 2; // min distance = 2 * min cell radius (in pixels)
             String plotName = outDirResults + imgName + "_" + roiName + "_Gplot.tif";
             double[] res = computeSdiG(cellPop, mask, imgCell, minDist, 50, plotName);
-            area = res[0];
-            sdiG = res[1];
+            sdiG = res[0];
+            area = res[1];
         }
-
         outPutGlobal.write(imgName+"\t"+roiName+"\t"+roiArea+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellsIntMean+"\t"+cellsIntSD+"\t"+cellsVolMean+"\t"+
                             cellsVolSD+"\t"+cellsVolSum+"\t"+cellsClosestNeiDistMean+"\t"+cellsClosestNeiDistSD+"\t"+cellsNeiMeanDistMean+"\t"+
-                            cellsNeiMeanDistSD+"\t"+cellsNeiMaxDistMean+"\t"+cellsNeiMaxDistSD+"\t"+sdiG+"\t"+area);
+                            cellsNeiMeanDistSD+"\t"+cellsNeiMaxDistMean+"\t"+cellsNeiMaxDistSD);
         if (vessel) {
             double vesselDistMean = dist.stream().mapToDouble(val -> val).average().orElse(0.0);
             double vesselRadiusMean = radius.stream().mapToDouble(val -> val).average().orElse(0.0);
-            outPutGlobal.write("\t"+vesselDistMean+"\t"+vesselRadiusMean);
+            outPutGlobal.write("\t"+sdiG+"\t"+area+"\t"+vesselDistMean+"\t"+vesselRadiusMean);
         }
         outPutGlobal.write("\n");
         outPutGlobal.flush();

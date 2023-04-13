@@ -163,7 +163,6 @@ public class Sox_10 implements PlugIn {
                     // Cells channel
                     Objects3DIntPopulation cellPop = tools.getCellsInRoi(cellsDetection, imgCells, scaledRoi);
                     System.out.println(cellPop.getNbObjects() + " cells found in ROI "+scaledRoi.getName());
-                    tools.closeImage(cellsDetection);
                     
                     // Vessels channel
                     Objects3DIntPopulation vesselPop = new Objects3DIntPopulation();
@@ -187,7 +186,7 @@ public class Sox_10 implements PlugIn {
                 }
                 
                 tools.closeImage(imgCells);
-                
+                tools.closeImage(cellsDetection);
                 if (tools.vessel){
                     tools.closeImage(imgVessel);
                     tools.closeImage(vesselsDetection);
