@@ -805,11 +805,11 @@ public class Tools {
         }
         outPutGlobal.write(imgName+"\t"+roiName+"\t"+roiArea+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellsIntMean+"\t"+cellsIntSD+"\t"+cellsVolMean+"\t"+
                             cellsVolSD+"\t"+cellsVolSum+"\t"+cellsClosestNeiDistMean+"\t"+cellsClosestNeiDistSD+"\t"+cellsNeiMeanDistMean+"\t"+
-                            cellsNeiMeanDistSD+"\t"+cellsNeiMaxDistMean+"\t"+cellsNeiMaxDistSD);
+                            cellsNeiMeanDistSD+"\t"+cellsNeiMaxDistMean+"\t"+cellsNeiMaxDistSD+"\t"+sdiG+"\t"+area);
         if (vessel) {
             double vesselDistMean = dist.stream().mapToDouble(val -> val).average().orElse(0.0);
             double vesselRadiusMean = radius.stream().mapToDouble(val -> val).average().orElse(0.0);
-            outPutGlobal.write("\t"+sdiG+"\t"+area+"\t"+vesselDistMean+"\t"+vesselRadiusMean);
+            outPutGlobal.write("\t"+vesselDistMean+"\t"+vesselRadiusMean);
         }
         outPutGlobal.write("\n");
         outPutGlobal.flush();
