@@ -221,13 +221,16 @@ public class SpatialStatistics {
         return sdi;
     }
     
-    public double getAreaCurve() {
-        double sum = 0.0;
+    public double getAUCDifference() {
+        double areaObs = 0.0;
         for(int i = 0; i < obsDesc.size() - 1; i++){
-            sum += (obsDesc.getValue(i + 1) - obsDesc.getValue(i)) * obsCD.getValue(i);
-            sum += (obsDesc.getValue(i + 1)- obsDesc.getValue(i)) * (obsCD.getValue(i + 1) - obsCD.getValue(i)) / 2.0;
+            areaObs += (obsDesc.getValue(i + 1) - obsDesc.getValue(i)) * ((obsCD.getValue(i + 1) + obsCD.getValue(i)) / 2.0);
         }
-        return sum;
+        double areaRand = 0.0;
+        for(int i = 0; i < xEvals.size() - 1; i++){
+            areaRand += (xEvals.getValue(i + 1) - xEvals.getValue(i)) * ((averageCD.getValue(i + 1) + averageCD.getValue(i)) / 2.0);
+        }
+        return(areaObs - areaRand + (xEvals.getMaximum() - obsDesc.getMaximum()));
     }
 
 

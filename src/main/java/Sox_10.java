@@ -25,6 +25,7 @@ import loci.plugins.in.ImporterOptions;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom2.Object3DInt;
 import mcib3d.geom2.Objects3DIntPopulation;
+import mcib3d.image3d.ImageFloat;
 import org.apache.commons.io.FilenameUtils;
 
 
@@ -62,8 +63,6 @@ public class Sox_10 implements PlugIn {
             if (!Files.exists(Paths.get(outDirResults))) {
                 outDir.mkdir();
             }
-            // Write header in results file
-            tools.writeHeaders(outDirResults);
             
             // Create OME-XML metadata store of the latest schema version
             ServiceFactory factory = new ServiceFactory();
@@ -85,6 +84,9 @@ public class Sox_10 implements PlugIn {
                 IJ.showMessage("Error", "Plugin canceled");
                 return;
             }
+            
+            // Write header in results file
+            tools.writeHeaders(outDirResults);
                  
             for (String f : imageFiles) {
                 reader.setId(f);
@@ -118,8 +120,8 @@ public class Sox_10 implements PlugIn {
                 // Vessels channel
                 ImagePlus imgVessel = null;
                 ImagePlus vesselsDetection = null;
-                ImagePlus vesselsDistMap = null;
-                ImagePlus vesselsDistMapInv = null;
+                ImageFloat vesselsDistMap = null;
+                ImageFloat vesselsDistMapInv = null;
                 ImagePlus vesselsSkel = null;
                 if (tools.vessel){
                     tools.print("Opening vessels channels...");
@@ -130,27 +132,30 @@ public class Sox_10 implements PlugIn {
                     options.setCBegin(series, channelIndex[1]);
                     options.setCEnd(series, channelIndex[1]);
                     ImagePlus imgVessel2 = BF.openImagePlus(options)[0];
-                    // Add two vessels chanels
+                    
+                    // Add vessels channels together
                     imgVessel =  new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
                     tools.closeImage(imgVessel1);
                     tools.closeImage(imgVessel2);
                     
                     tools.print("Detecting vessels...");
-                    vesselsDetection = tools.vesselsDetection(imgVessel, pyramidalFactor);
-                    tools.print("Computing vessels skeleton...");
-                    vesselsSkel = tools.vesselsSkeletonize3D(vesselsDetection);
+                    vesselsDetection = tools.vesselsDetection(imgVessel);
+                    
                     tools.print("Computing vessels distance maps...");
                     vesselsDistMap = tools.localThickness3D(vesselsDetection, false);
                     vesselsDistMapInv = tools.localThickness3D(vesselsDetection, true);
+                    
+                    tools.print("Computing vessels skeleton...");
+                    vesselsSkel = tools.vesselsSkeletonize3D(vesselsDetection);
                 }
+                
                  // Cells channel
                 tools.print("Opening cells channel...");
                 options.setCBegin(series, channelIndex[2]);
                 options.setCEnd(series, channelIndex[2]);
-                ImagePlus imgCellsOrg = BF.openImagePlus(options)[0];
-                // if vessels exist remove vessel in image cells 
-                ImagePlus imgCells = (tools.vessel) ?  new ImageCalculator().run("subtract stack create", imgCellsOrg, imgVessel) : imgCellsOrg;
-                tools.closeImage(imgCellsOrg);
+                ImagePlus imgCells = BF.openImagePlus(options)[0];
+                // If vessels channel exists, mask vessels in cells channel 
+                if (tools.vessel) imgCells = new ImageCalculator().run("subtract stack create", imgCells, imgVessel);
                 tools.print("Detecting cells...");
                 ImagePlus cellsDetection = tools.cellposeDetection(imgCells);
                 
@@ -162,7 +167,7 @@ public class Sox_10 implements PlugIn {
 
                     // Cells channel
                     Objects3DIntPopulation cellPop = tools.getCellsInRoi(cellsDetection, imgCells, scaledRoi);
-                    System.out.println(cellPop.getNbObjects() + " cells found in ROI "+scaledRoi.getName());
+                    System.out.println(cellPop.getNbObjects() + " cells found in ROI");
                     
                     // Vessels channel
                     Objects3DIntPopulation vesselPop = new Objects3DIntPopulation();
@@ -190,8 +195,8 @@ public class Sox_10 implements PlugIn {
                 if (tools.vessel){
                     tools.closeImage(imgVessel);
                     tools.closeImage(vesselsDetection);
-                    tools.closeImage(vesselsDistMap);
-                    tools.closeImage(vesselsDistMapInv);
+                    tools.closeImage(vesselsDistMap.getImagePlus());
+                    tools.closeImage(vesselsDistMapInv.getImagePlus());
                     tools.closeImage(vesselsSkel);
                 }
             }
