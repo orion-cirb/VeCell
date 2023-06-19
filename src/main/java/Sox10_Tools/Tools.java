@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.awt.Rectangle;
 import java.util.List;
 import javax.swing.ImageIcon;
+import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
 import loci.formats.FormatException;
 import loci.formats.meta.IMetadata;
@@ -217,69 +218,55 @@ public class Tools {
     }
     
     
-    /**
-     * Find channels name
+      /**
+     * Find channels name and None to end of list
+     * @param imageName
+     * @param meta
+     * @param reader
+     * @return 
      * @throws loci.common.services.DependencyException
      * @throws loci.common.services.ServiceException
      * @throws loci.formats.FormatException
      * @throws java.io.IOException
      */
-    public String[] findChannels (String imageName, IMetadata meta, ImageProcessorReader reader) throws loci.common.services.DependencyException, ServiceException, FormatException, IOException {
+    public String[] findChannels (String imageName, IMetadata meta, ImageProcessorReader reader) throws DependencyException, ServiceException, FormatException, IOException {
         int chs = reader.getSizeC();
-        String[] channels = new String[chs];
+        String[] channels = new String[chs+1];
         String imageExt =  FilenameUtils.getExtension(imageName);
         switch (imageExt) {
             case "nd" :
                 for (int n = 0; n < chs; n++) 
-                {
-                    if (meta.getChannelID(0, n) == null)
-                        channels[n] = Integer.toString(n);
-                    else 
-                        channels[n] = meta.getChannelName(0, n);
-                }
+                    channels[n] = (meta.getChannelName(0, n).toString().equals("")) ? Integer.toString(n) : meta.getChannelName(0, n).toString();
                 break;
             case "nd2" :
                 for (int n = 0; n < chs; n++) 
-                {
-                    if (meta.getChannelID(0, n) == null)
-                        channels[n] = Integer.toString(n);
-                    else 
-                        channels[n] = meta.getChannelName(0, n);
-                }
+                    channels[n] = (meta.getChannelName(0, n).toString().equals("")) ? Integer.toString(n) : meta.getChannelName(0, n).toString();
                 break;
             case "lif" :
                 for (int n = 0; n < chs; n++) 
                     if (meta.getChannelID(0, n) == null || meta.getChannelName(0, n) == null)
                         channels[n] = Integer.toString(n);
                     else 
-                        channels[n] = meta.getChannelName(0, n);
+                        channels[n] = meta.getChannelName(0, n).toString();
                 break;
             case "czi" :
                 for (int n = 0; n < chs; n++) 
-                    if (meta.getChannelID(0, n) == null)
-                        channels[n] = Integer.toString(n);
-                    else 
-                        channels[n] = meta.getChannelFluor(0, n);
+                    channels[n] = (meta.getChannelFluor(0, n).toString().equals("")) ? Integer.toString(n) : meta.getChannelFluor(0, n).toString();
                 break;
             case "ics" :
                 for (int n = 0; n < chs; n++) 
-                    if (meta.getChannelID(0, n) == null)
-                        channels[n] = Integer.toString(n);
-                    else 
-                        channels[n] = meta.getChannelExcitationWavelength(0, n).value().toString();
-                break;
+                    channels[n] = meta.getChannelEmissionWavelength(0, n).value().toString();
+                break;    
             case "ics2" :
                 for (int n = 0; n < chs; n++) 
-                    if (meta.getChannelID(0, n) == null)
-                        channels[n] = Integer.toString(n);
-                    else 
-                        channels[n] = meta.getChannelExcitationWavelength(0, n).value().toString();
-                break;   
+                    channels[n] = meta.getChannelEmissionWavelength(0, n).value().toString();
+                break; 
             default :
                 for (int n = 0; n < chs; n++)
                     channels[n] = Integer.toString(n);
         }
-        return(channels);         
+        channels[chs] = "None";
+        return(channels);     
     }
     
     

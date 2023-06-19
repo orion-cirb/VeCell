@@ -2,6 +2,7 @@ import Sox10_Tools.Tools;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
+import ij.plugin.Duplicator;
 import ij.plugin.frame.RoiManager;
 import ij.plugin.ImageCalculator;
 import ij.plugin.PlugIn;
@@ -128,16 +129,17 @@ public class Sox_10 implements PlugIn {
                     options.setCBegin(series, channelIndex[0]);
                     options.setCEnd(series, channelIndex[0]); 
                     ImagePlus imgVessel1 = BF.openImagePlus(options)[0];
-                    
-                    options.setCBegin(series, channelIndex[1]);
-                    options.setCEnd(series, channelIndex[1]);
-                    ImagePlus imgVessel2 = BF.openImagePlus(options)[0];
-                    
-                    // Add vessels channels together
-                    imgVessel =  new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
+                    ImagePlus imgVessel2 = null;
+                    if (!chsName[channelIndex[1]].equals("None")) {
+                        options.setCBegin(series, channelIndex[1]);
+                        options.setCEnd(series, channelIndex[1]);
+                        imgVessel2 = BF.openImagePlus(options)[0];
+                    }
+                    // Add two vessels chanels
+                    imgVessel =  (imgVessel2 == null) ? new Duplicator().run(imgVessel1) : new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
                     tools.closeImage(imgVessel1);
-                    tools.closeImage(imgVessel2);
-                    
+                    if (imgVessel2 != null)
+                        tools.closeImage(imgVessel2);
                     tools.print("Detecting vessels...");
                     vesselsDetection = tools.vesselsDetection(imgVessel);
                     
