@@ -2,11 +2,9 @@ package Sox10_Tools;
 
 import Sox10_Tools.Cellpose.CellposeTaskSettings;
 import Sox10_Tools.Cellpose.CellposeSegmentImgPlusAdvanced;
-import features.TubenessProcessor;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
-import ij.ImageStack;
 import ij.gui.Plot;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
@@ -81,7 +79,7 @@ public class Tools {
     
     private Calibration cal;
     private double pixelVol;
-    String[] chNames = new String[]{"Vessel 1", "Vessel 2", "Sox"};
+    String[] chNames = new String[]{"Vessel 1", "Vessel 2 (optional)", "Sox"};
     
     public String cellposeEnvDir = IJ.isWindows()? System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose" : "/opt/miniconda3/envs/cellpose";
     public String cellposeModel = "cyto2";
@@ -92,13 +90,12 @@ public class Tools {
     public double minCellInt = 500;
     
     private int nbNei = 10; // K-nearest neighbors
-    private boolean doG = false;
-    private double doG1 = 10;
-    private double doG2 = 12;
+    private boolean computeGFunction = false;
     private int nbRandomSamples = 50;
     
     public boolean vessel = false;
-    public boolean tubeness = false;
+    private double dogSigma1 = 10;
+    private double dogSigma2 = 12;
     private String vesselThMet = "Triangle";
     public double minVesselVol = 500; // um3
     private double roiDilation = 50; // um
@@ -295,15 +292,14 @@ public class Tools {
         
         gd.addMessage("Cells spatial distribution", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Number of neighbors : ", nbNei, 0);
-        gd.addCheckbox("Compare with random distribution", doG);
+        gd.addCheckbox("Compare with random distribution", computeGFunction);
         gd.addNumericField("Number of random samples : ", nbRandomSamples);
         
         gd.addMessage("Cells distance to vessels", Font.getFont("Monospace"), Color.blue);
         gd.addCheckbox("Compute cells distance to closest vessel", vessel);
-        gd.addCheckbox("Vessels tubeness filtering", tubeness);
-        gd.addMessage("DOG Filter", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("DOG sigma1 : ", doG1, 2);
-        gd.addNumericField("DOG sigma2 : ", doG2, 2);
+        gd.addMessage("Vessels DoG filtering", Font.getFont("Monospace"), Color.black);
+        gd.addNumericField("Sigma 1 : ", dogSigma1, 2);
+        gd.addNumericField("Sigma 2 : ", dogSigma2, 2);
         String[] methods = AutoThresholder.getMethods();
         gd.addChoice("Vessels thresholding method :", methods, vesselThMet);
         gd.addNumericField("Min vessel size (µm3) : ", minVesselVol, 2);
@@ -326,13 +322,12 @@ public class Tools {
         minCellInt = gd.getNextNumber();
         
         nbNei = (int)gd.getNextNumber();
-        doG = gd.getNextBoolean();
+        computeGFunction = gd.getNextBoolean();
         nbRandomSamples = (int)gd.getNextNumber();
         
         vessel = gd.getNextBoolean();
-        tubeness = gd.getNextBoolean();
-        doG1 = gd.getNextNumber();
-        doG2 = gd.getNextNumber();
+        dogSigma1 = gd.getNextNumber();
+        dogSigma2 = gd.getNextNumber();
         vesselThMet = gd.getNextChoice();
         minVesselVol = gd.getNextNumber();
         roiDilation = gd.getNextNumber();
@@ -459,30 +454,18 @@ public class Tools {
     
     
     /**
-     * Detect vessels applying a median filter + DoG or tubeness + threshold + connected components labeling
+     * Detect vessels applying a median filter + DoG + threshold + connected components labeling
      */
     public ImagePlus vesselsDetection(ImagePlus img) {
         ImagePlus imgTh;
-        if (tubeness) {
-            ImagePlus imgSub = img.duplicate();
-            IJ.run(imgSub, "Subtract Background...", "rolling=50 stack");
-            ImagePlus imgTub = tubeness(imgSub.resize((int)(0.5*img.getWidth()), (int)(0.5*img.getHeight()), 1, "average"), 4);
-            ImagePlus imgBin = threshold(imgTub.resize(img.getWidth(), img.getHeight(), "bilinear"), vesselThMet, true);
-            imgTh = medianFilter(imgBin, 4, 4);
-            
-            closeImage(imgSub);
-            closeImage(imgTub);
-            closeImage(imgBin);
-        } else {
-            ImagePlus imgMed = medianFilter(img, 2, 2);
-            ImagePlus imgDOG = DOG(imgMed, 8, 12);
-            ImagePlus imgBin = threshold(imgDOG, vesselThMet, true);
-            imgTh = medianFilter(imgBin, 4, 4);
-            
-            closeImage(imgMed);
-            closeImage(imgDOG);
-            closeImage(imgBin);
-        }
+        ImagePlus imgMed = medianFilter(img, 2, 2);
+        ImagePlus imgDOG = DOG(imgMed, dogSigma1, dogSigma2);
+        ImagePlus imgBin = threshold(imgDOG, vesselThMet, true);
+        imgTh = medianFilter(imgBin, 4, 4);
+
+        closeImage(imgMed);
+        closeImage(imgDOG);
+        closeImage(imgBin);
 
         ImageInt imgLabels = new ImageLabeller().getLabels(ImageHandler.wrap(imgTh));
         imgLabels.setCalibration(cal);
@@ -517,20 +500,6 @@ public class Tools {
         return(imgDOG);
     }
     
-    
-    /**
-     * Perform tubeness filtering
-     */
-    public ImagePlus tubeness(ImagePlus img, float sigma) {
-        ImageStack stack = new ImageStack(img.getWidth(), img.getHeight());
-        for(int z=1; z <= img.getNSlices(); z++) {
-            ImagePlus slice = new Duplicator().run(img, z, z);
-            ImagePlus tub = new TubenessProcessor(4, true).generateImage(slice);
-            stack.addSlice(tub.getProcessor());
-        }
-        return(new ImagePlus("", stack));
-    }
-           
     
     /**
      * Perform automatic thresholding, with threshold computed on the z-slice having the maximum mean intensity
@@ -727,7 +696,7 @@ public class Tools {
                 + "Cells distance to closest neighbor SD\tCells mean distance to "+nbNei+" closest neighbors\t"
                 + "Cells distance to "+nbNei+" closest neighbors SD"+"\tCells mean of max distance to "+nbNei+" neighbors\t"+
                 "Cells SD of max distance to "+nbNei+" neighbors");
-        if (doG) outPutGlobal.write("\tCells G-function SDI\tCells G-function AUC difference");
+        if (computeGFunction) outPutGlobal.write("\tCells G-function SDI\tCells G-function AUC difference");
         if (vessel) outPutGlobal.write("\tCells mean distance to closest vessel\tVessels mean radius");
         outPutGlobal.write("\n");
         outPutGlobal.flush();
@@ -809,7 +778,7 @@ public class Tools {
         outPutGlobal.write(imgName+"\t"+roiName+"\t"+roiArea+"\t"+roiVol+"\t"+cellPop.getNbObjects()+"\t"+cellsIntMean+"\t"+cellsIntSD+"\t"+cellsVolMean+"\t"+
                             cellsVolSD+"\t"+cellsVolSum+"\t"+cellsClosestNeiDistMean+"\t"+cellsClosestNeiDistSD+"\t"+cellsNeiMeanDistMean+"\t"+
                             cellsNeiMeanDistSD+"\t"+cellsNeiMaxDistMean+"\t"+cellsNeiMaxDistSD);
-        if (doG) {
+        if (computeGFunction) {
             System.out.println("Computing G-function-related spatial distribution index...");
             Object3DInt mask = roiMask(imgCell, roi);
             double minDist = Math.pow(3*minCellVol/(4*Math.PI*pixelVol), 1/3) * 2; // min distance = 2 * min cell radius (in pixels)
