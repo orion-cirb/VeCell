@@ -93,11 +93,13 @@ public class Tools {
     
     private int nbNei = 10; // K-nearest neighbors
     private boolean doG = false;
+    private double doG1 = 10;
+    private double doG2 = 12;
     private int nbRandomSamples = 50;
     
     public boolean vessel = false;
     public boolean tubeness = false;
-    private String vesselThMet = "Li";
+    private String vesselThMet = "Triangle";
     public double minVesselVol = 500; // um3
     private double roiDilation = 50; // um
     
@@ -299,6 +301,9 @@ public class Tools {
         gd.addMessage("Cells distance to vessels", Font.getFont("Monospace"), Color.blue);
         gd.addCheckbox("Compute cells distance to closest vessel", vessel);
         gd.addCheckbox("Vessels tubeness filtering", tubeness);
+        gd.addMessage("DOG Filter", Font.getFont("Monospace"), Color.blue);
+        gd.addNumericField("DOG sigma1 : ", doG1, 2);
+        gd.addNumericField("DOG sigma2 : ", doG2, 2);
         String[] methods = AutoThresholder.getMethods();
         gd.addChoice("Vessels thresholding method :", methods, vesselThMet);
         gd.addNumericField("Min vessel size (µm3) : ", minVesselVol, 2);
@@ -326,6 +331,8 @@ public class Tools {
         
         vessel = gd.getNextBoolean();
         tubeness = gd.getNextBoolean();
+        doG1 = gd.getNextNumber();
+        doG2 = gd.getNextNumber();
         vesselThMet = gd.getNextChoice();
         minVesselVol = gd.getNextNumber();
         roiDilation = gd.getNextNumber();
@@ -468,7 +475,7 @@ public class Tools {
             closeImage(imgBin);
         } else {
             ImagePlus imgMed = medianFilter(img, 2, 2);
-            ImagePlus imgDOG = DOG(imgMed, 5, 10);
+            ImagePlus imgDOG = DOG(imgMed, 8, 12);
             ImagePlus imgBin = threshold(imgDOG, vesselThMet, true);
             imgTh = medianFilter(imgBin, 4, 4);
             
