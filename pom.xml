@@ -67,12 +67,6 @@
                 <version>6.8.1</version>
             </dependency>
             <dependency>
-                <groupId>mcib</groupId>
-                <artifactId>mcib3d-core</artifactId>
-                <version>4.0.93</version>
-                <type>jar</type>
-            </dependency>
-            <dependency>
                     <groupId>ome</groupId>
                     <artifactId>formats-common</artifactId>
                     <version>5.2.4</version>
@@ -110,8 +104,8 @@
             </dependency>
             <dependency>
              <groupId>org.framagit.mcib3d</groupId>
-             <artifactId>mcib3d-plugins</artifactId>
-             <version>4.0.63</version>
+             <artifactId>mcib3d-core</artifactId>
+             <version>4.1.0</version>
              <type>jar</type>
             </dependency>
             <dependency>
@@ -161,9 +155,9 @@
                                 <goal>run</goal>
                             </goals>
                             <configuration>
-                                <tasks>
+                                <target>
                                     <copy todir="${imagej.app.directory}/plugins/CIRB" file="target/${project.build.finalName}.jar"/>
-                                </tasks>
+                                </target>
                             </configuration>
                         </execution>
                     </executions>
