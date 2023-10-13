@@ -155,9 +155,9 @@
                                 <goal>run</goal>
                             </goals>
                             <configuration>
-                                <target>
+                                <tasks>
                                     <copy todir="${imagej.app.directory}/plugins/CIRB" file="target/${project.build.finalName}.jar"/>
-                                </target>
+                                </tasks>
                             </configuration>
                         </execution>
                     </executions>

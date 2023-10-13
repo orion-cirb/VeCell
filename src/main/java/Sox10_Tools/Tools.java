@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.awt.Rectangle;
 import java.util.List;
-import java.util.concurrent.atomic.DoubleAccumulator;
 import javax.swing.ImageIcon;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
@@ -684,16 +683,6 @@ public class Tools {
         }
     }
     
-    /**
-     * Find sum vessel volume
-     */
-    private double findPopVolume(Objects3DIntPopulation pop) {
-        DoubleAccumulator sumVol = new DoubleAccumulator(Double::sum,0.d);
-        pop.getObjects3DInt().parallelStream().forEach(obj -> { 
-            sumVol.accumulate(new MeasureVolume(obj).getVolumeUnit());
-        });
-        return(sumVol.doubleValue());
-    }
     
     /**
      * Write headers in results files
@@ -708,7 +697,7 @@ public class Tools {
                 + "Cells distance to "+nbNei+" closest neighbors SD"+"\tCells mean of max distance to "+nbNei+" neighbors\t"+
                 "Cells SD of max distance to "+nbNei+" neighbors");
         if (computeGFunction) outPutGlobal.write("\tCells G-function SDI\tCells G-function AUC difference");
-        if (vessel) outPutGlobal.write("\tCells mean distance to closest vessel\tVessels mean radius\tVessels total volume");
+        if (vessel) outPutGlobal.write("\tCells mean distance to closest vessel\tVessels mean radius");
         outPutGlobal.write("\n");
         outPutGlobal.flush();
 
@@ -798,10 +787,9 @@ public class Tools {
             outPutGlobal.write("\t"+res[0]+"\t"+res[1]);
         }
         if (vessel) {
-            double vesselsVol = findPopVolume(vesselPop);
             double vesselDistMean = dist.stream().mapToDouble(val -> val).average().orElse(0.0);
             double vesselRadiusMean = radius.stream().mapToDouble(val -> val).average().orElse(0.0);
-            outPutGlobal.write("\t"+vesselDistMean+"\t"+vesselRadiusMean+"\t"+vesselsVol);
+            outPutGlobal.write("\t"+vesselDistMean+"\t"+vesselRadiusMean);
         }
         outPutGlobal.write("\n");
         outPutGlobal.flush();
