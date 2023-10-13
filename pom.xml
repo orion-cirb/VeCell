@@ -7,7 +7,7 @@
         
 	<groupId>cirb</groupId>
 	<artifactId>Sox_10</artifactId>
-	<version>3.0.0</version>
+	<version>4.0.0</version>
         <packaging>jar</packaging>
 	<name>plugins/CIRB/Sox_10.jar</name>
 
@@ -59,7 +59,7 @@
                 <groupId>net.imagej</groupId>
                 <artifactId>ij</artifactId>
                 <version>1.53r</version>
-                  <type>jar</type>
+                <type>jar</type>
             </dependency>
             <dependency>
                 <groupId>ome</groupId>
@@ -67,10 +67,10 @@
                 <version>6.8.1</version>
             </dependency>
             <dependency>
-                    <groupId>ome</groupId>
-                    <artifactId>formats-common</artifactId>
-                    <version>5.2.4</version>
-                    <type>jar</type>
+                <groupId>ome</groupId>
+                <artifactId>formats-common</artifactId>
+                <version>5.2.4</version>
+                <type>jar</type>
              </dependency>
             <dependency>
                   <groupId>net.haesleinhuepf</groupId>
@@ -97,22 +97,22 @@
                 <type>jar</type>
             </dependency>
             <dependency>
-             <groupId>sc.fiji</groupId>
-             <artifactId>LocalThickness_</artifactId>
-             <version>4.0.4-SNAPSHOT</version>
-             <type>jar</type>
+                <groupId>sc.fiji</groupId>
+                <artifactId>LocalThickness_</artifactId>
+                <version>4.0.4-SNAPSHOT</version>
+                <type>jar</type>
             </dependency>
             <dependency>
-             <groupId>org.framagit.mcib3d</groupId>
-             <artifactId>mcib3d-core</artifactId>
-             <version>4.1.0</version>
-             <type>jar</type>
+                <groupId>org.framagit.mcib3d</groupId>
+                <artifactId>mcib3d-core</artifactId>
+                <version>4.1.0</version>
+                <type>jar</type>
             </dependency>
             <dependency>
-             <groupId>sc.fiji</groupId>
-             <artifactId>VIB_</artifactId>
-             <version>3.0.5-SNAPSHOT</version>
-             <type>jar</type>
+                <groupId>sc.fiji</groupId>
+                <artifactId>VIB_</artifactId>
+                <version>3.0.5-SNAPSHOT</version>
+                <type>jar</type>
             </dependency>
 	</dependencies>
         
