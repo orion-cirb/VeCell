@@ -10,8 +10,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -26,7 +28,9 @@ import loci.plugins.in.ImporterOptions;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom2.Object3DInt;
 import mcib3d.geom2.Objects3DIntPopulation;
+import mcib3d.geom2.measurements.MeasureVolume;
 import mcib3d.image3d.ImageFloat;
+import mcib3d.image3d.ImageHandler;
 import org.apache.commons.io.FilenameUtils;
 
 
@@ -36,8 +40,6 @@ import org.apache.commons.io.FilenameUtils;
 public class Sox_10 implements PlugIn {
     
     private Tools tools = new Tools();
-    private String imageDir;
-    private static String outDirResults;
     
     public void run(String arg) {
         try {
@@ -45,7 +47,7 @@ public class Sox_10 implements PlugIn {
                 return;
             }
             
-            imageDir = IJ.getDirectory("Choose directory containing image files...");
+            String imageDir = IJ.getDirectory("Choose directory containing image files...");
             if (imageDir == null) {
                 return;
             }
@@ -56,13 +58,6 @@ public class Sox_10 implements PlugIn {
             if (imageFiles.isEmpty()) {
                 IJ.showMessage("Error", "No images found with " + fileExt + " extension");
                 return;
-            }
-            
-            // Create output folder
-            outDirResults = imageDir + File.separator + "Results" + File.separator;
-            File outDir = new File(outDirResults);
-            if (!Files.exists(Paths.get(outDirResults))) {
-                outDir.mkdir();
             }
             
             // Create OME-XML metadata store of the latest schema version
@@ -84,6 +79,13 @@ public class Sox_10 implements PlugIn {
             if (channelIndex == null) {
                 IJ.showMessage("Error", "Plugin canceled");
                 return;
+            }
+            
+            // Create output folder
+            String outDirResults = imageDir + File.separator + "Results_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date()) + File.separator;
+            File outDir = new File(outDirResults);
+            if (!Files.exists(Paths.get(outDirResults))) {
+                outDir.mkdir();
             }
             
             // Write header in results file
@@ -115,7 +117,6 @@ public class Sox_10 implements PlugIn {
                 options.setCrop(true);
                 
                 // Compute pyramidal factor
-                int series = 0;
                 int pyramidalFactor = tools.getPyramidalFactor(reader);
                 
                 // Vessels channel
@@ -126,17 +127,17 @@ public class Sox_10 implements PlugIn {
                 ImagePlus vesselsSkel = null;
                 if (tools.vessel){
                     tools.print("Opening vessels channels...");
-                    options.setCBegin(series, channelIndex[0]);
-                    options.setCEnd(series, channelIndex[0]); 
+                    options.setCBegin(tools.imgSeries, channelIndex[0]);
+                    options.setCEnd(tools.imgSeries, channelIndex[0]); 
                     ImagePlus imgVessel1 = BF.openImagePlus(options)[0];
                     ImagePlus imgVessel2 = null;
                     if (!chsName[channelIndex[1]].equals("None")) {
-                        options.setCBegin(series, channelIndex[1]);
-                        options.setCEnd(series, channelIndex[1]);
+                        options.setCBegin(tools.imgSeries, channelIndex[1]);
+                        options.setCEnd(tools.imgSeries, channelIndex[1]);
                         imgVessel2 = BF.openImagePlus(options)[0];
                     }
                     // Add two vessels chanels
-                    imgVessel =  (imgVessel2 == null) ? new Duplicator().run(imgVessel1) : new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
+                    imgVessel = (imgVessel2 == null) ? new Duplicator().run(imgVessel1) : new ImageCalculator().run("add stack create", imgVessel1, imgVessel2);
                     tools.closeImage(imgVessel1);
                     if (imgVessel2 != null)
                         tools.closeImage(imgVessel2);
@@ -153,44 +154,51 @@ public class Sox_10 implements PlugIn {
                 
                  // Cells channel
                 tools.print("Opening cells channel...");
-                options.setCBegin(series, channelIndex[2]);
-                options.setCEnd(series, channelIndex[2]);
+                options.setCBegin(tools.imgSeries, channelIndex[2]);
+                options.setCEnd(tools.imgSeries, channelIndex[2]);
                 ImagePlus imgCells = BF.openImagePlus(options)[0];
-                // If vessels channel exists, mask vessels in cells channel 
-                if (tools.vessel) imgCells = new ImageCalculator().run("subtract stack create", imgCells, imgVessel);
                 tools.print("Detecting cells...");
                 ImagePlus cellsDetection = tools.cellposeDetection(imgCells);
                 
                 // For each roi, open cropped image
+                ImageHandler imhCells = ImageHandler.wrap(imgCells).createSameDimensions();
+                ImageHandler imhCellsDist = imhCells.createSameDimensions();
+                ImageHandler imhVessels = imhCells.createSameDimensions();
                 for (Roi roi : rois) {
                     String roiName = roi.getName();
                     tools.print("- Analyzing ROI " + roiName + " -");
                     Roi scaledRoi = tools.scaleRoi(roi, pyramidalFactor);
 
                     // Cells channel
-                    Objects3DIntPopulation cellPop = tools.getCellsInRoi(cellsDetection, imgCells, scaledRoi);
-                    System.out.println(cellPop.getNbObjects() + " cells found in ROI");
+                    Objects3DIntPopulation cellsPop = tools.getCellsInRoi(cellsDetection, imgCells, scaledRoi);
+                    System.out.println(cellsPop.getNbObjects() + " cells found in ROI");
                     
                     // Vessels channel
-                    Objects3DIntPopulation vesselPop = new Objects3DIntPopulation();
+                    Object3DInt vesselsObj = new Object3DInt();
                     ArrayList<Double> dist = new ArrayList<>();
                     ArrayList<Double> radius = new ArrayList<>();
+                    double vesselsVol = 0;
                     if (tools.vessel){
-                        vesselPop = tools.getVesselsInRoi(vesselsDetection, scaledRoi);
+                        vesselsObj = tools.getVesselsInRoi(vesselsDetection, scaledRoi, true);
+                        vesselsVol = new MeasureVolume(tools.getVesselsInRoi(vesselsDetection, scaledRoi, false)).getVolumeUnit();
                         Object3DInt vesselsSkelObj = tools.getVesselsSkelInRoi(vesselsSkel, scaledRoi);
                         
                         tools.print("Computing cells distance to vessels...");
-                        dist = tools.findCellVesselDist(cellPop, vesselsDistMapInv);
+                        dist = tools.findCellVesselDist(cellsPop, vesselsDistMapInv);
                         
                         tools.print("Computing vessels radius...");
-                        radius = tools.findVesselRadius(cellPop, vesselsDistMap, vesselsSkelObj);
+                        radius = tools.findVesselRadius(cellsPop, vesselsDistMap, vesselsSkelObj);
                     }
                     
                     tools.print("Drawing results...");
-                    tools.drawResults(cellPop, vesselPop, imgCells, imgVessel, dist, outDirResults+rootName+"_"+roi.getName());        
+                    tools.drawResultsInRoi(cellsPop, vesselsObj, imhCells, imhCellsDist, imhVessels, dist);        
                     tools.print("Writing results...");
-                    tools.writeResults(cellPop, vesselPop, dist, radius, imgCells, roi.getName(), scaledRoi, rootName, outDirResults);
+                    tools.writeResults(cellsPop, dist, radius, vesselsVol, imgCells, roi.getName(), scaledRoi, rootName, outDirResults);
                 }
+                
+                
+                tools.drawResults(imgCells, imgVessel, imhCells, imhCellsDist, imhVessels, outDirResults+rootName);
+                
                 
                 tools.closeImage(imgCells);
                 tools.closeImage(cellsDetection);

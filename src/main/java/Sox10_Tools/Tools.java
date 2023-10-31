@@ -71,7 +71,7 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 public class Tools {
     
     public final ImageIcon icon = new ImageIcon(this.getClass().getResource("/Orion_icon.png"));
-    private final String helpUrl = "https://github.com/orion-cirb/Sox_10/tree/version3";
+    private final String helpUrl = "https://github.com/orion-cirb/Sox_10/tree/version4";
     public CLIJ2 clij2 = CLIJ2.getInstance();
     
     private BufferedWriter outPutGlobal;
@@ -79,25 +79,28 @@ public class Tools {
     
     private Calibration cal;
     private double pixelVol;
-    String[] chNames = new String[]{"Vessel 1", "Vessel 2 (optional)", "Sox"};
+    String[] chNames = new String[]{"Vessels 1", "Vessels 2 (optional)", "Astrocytes"};
+    
+    public int imgSeries = 0;
+    public int roiSeries = 2;
     
     public String cellposeEnvDir = IJ.isWindows()? System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose" : "/opt/miniconda3/envs/cellpose";
     public String cellposeModel = "cyto2";
-    public int cellposeDiam = 30;
+    public int cellposeDiam = 20;
     public double cellposeStitchTh = 0.5;
-    public double minCellVol = 75; // um3
-    public double maxCellVol = 750; // um3
-    public double minCellInt = 500;
+    public double minCellVol = 300; // um3
+    public double maxCellVol = 3000; // um3
+    public double minCellInt = 1500;
     
     private int nbNei = 10; // K-nearest neighbors
     private boolean computeGFunction = false;
     private int nbRandomSamples = 50;
     
-    public boolean vessel = false;
-    private double dogSigma1 = 10;
-    private double dogSigma2 = 12;
+    public boolean vessel = true;
+    private double dogSigma1 = 7;
+    private double dogSigma2 = 14;
     private String vesselThMet = "Triangle";
-    public double minVesselVol = 500; // um3
+    public double minVesselVol = 600; // um3
     private double roiDilation = 50; // um
     
 
@@ -122,7 +125,7 @@ public class Tools {
             return false;
         }
         try {
-            loader.loadClass("mcib3d.geom.Object3D");
+            loader.loadClass("mcib3d.geom2.Object3DInt");
         } catch (ClassNotFoundException e) {
             IJ.log("3D ImageJ Suite not installed, please install from update site");
             return false;
@@ -217,18 +220,14 @@ public class Tools {
     }
     
     
-      /**
-     * Find channels name and None to end of list
-     * @param imageName
-     * @param meta
-     * @param reader
-     * @return 
+     /**
+     * Find channels name and add None at the end of channels list
      * @throws loci.common.services.DependencyException
      * @throws loci.common.services.ServiceException
      * @throws loci.formats.FormatException
      * @throws java.io.IOException
      */
-    public String[] findChannels (String imageName, IMetadata meta, ImageProcessorReader reader) throws DependencyException, ServiceException, FormatException, IOException {
+    public String[] findChannels(String imageName, IMetadata meta, ImageProcessorReader reader) throws DependencyException, ServiceException, FormatException, IOException {
         int chs = reader.getSizeC();
         String[] channels = new String[chs+1];
         String imageExt =  FilenameUtils.getExtension(imageName);
@@ -274,40 +273,36 @@ public class Tools {
      */
     public int[] dialog(String[] channels) {
         GenericDialogPlus gd = new GenericDialogPlus("Parameters");
-        gd.setInsets​(0, 120, 0);
+        gd.setInsets​(0, 80, 0);
         gd.addImage(icon);
         
         gd.addMessage("Channels", Font.getFont("Monospace"), Color.blue);
         int index = 0;
         for (String chName : chNames) {
-            gd.addChoice(chName+" : ", channels, channels[index]);
+            gd.addChoice(chName+": ", channels, channels[index]);
             index++;
         }
         
         gd.addMessage("Cells detection", Font.getFont("Monospace"), Color.blue);
-        gd.addDirectoryField​("Cellpose env directory", cellposeEnvDir);
-        gd.addNumericField("Min cell size (µm3) : ", minCellVol, 2);
-        gd.addNumericField("Max cell size (µm3) : ", maxCellVol, 2);
-        gd.addNumericField("Min cell intensity : ", minCellInt, 2);
+        gd.addNumericField("Min cell size (µm3): ", minCellVol, 2);
+        gd.addNumericField("Max cell size (µm3): ", maxCellVol, 2);
+        gd.addNumericField("Min cell intensity: ", minCellInt, 2);
         
         gd.addMessage("Cells spatial distribution", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("Number of neighbors : ", nbNei, 0);
+        gd.addNumericField("Nb of neighbors: ", nbNei, 0);
         gd.addCheckbox("Compare with random distribution", computeGFunction);
-        gd.addNumericField("Number of random samples : ", nbRandomSamples);
+        gd.addNumericField("Nb of random samples: ", nbRandomSamples);
         
-        gd.addMessage("Cells distance to vessels", Font.getFont("Monospace"), Color.blue);
-        gd.addCheckbox("Compute cells distance to closest vessel", vessel);
-        gd.addMessage("Vessels DoG filtering", Font.getFont("Monospace"), Color.black);
-        gd.addNumericField("Sigma 1 : ", dogSigma1, 2);
-        gd.addNumericField("Sigma 2 : ", dogSigma2, 2);
+        gd.addMessage("Vessels detection", Font.getFont("Monospace"), Color.blue);
+        gd.addCheckbox("Detect vessels", vessel);
         String[] methods = AutoThresholder.getMethods();
-        gd.addChoice("Vessels thresholding method :", methods, vesselThMet);
-        gd.addNumericField("Min vessel size (µm3) : ", minVesselVol, 2);
-        gd.addNumericField("Max cell-vessel distance (µm) : ", roiDilation, 2);
+        gd.addChoice("Vessels thresholding method:", methods, vesselThMet);
+        gd.addNumericField("Min vessel size (µm3): ", minVesselVol, 2);
+        gd.addNumericField("Max cell-vessel distance (µm): ", roiDilation, 2);
         
         gd.addMessage("Image calibration", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("XY pixel size (µm) :", cal.pixelWidth, 4);
-        gd.addNumericField("Z pixel size (µm) :", cal.pixelDepth, 4);
+        gd.addNumericField("XY pixel size (µm):", cal.pixelWidth, 4);
+        gd.addNumericField("Z pixel size (µm):", cal.pixelDepth, 4);
         gd.addHelp(helpUrl);
         gd.showDialog();
         
@@ -316,7 +311,6 @@ public class Tools {
             chChoices[n] = ArrayUtils.indexOf(channels, gd.getNextChoice());
         }
         
-        cellposeEnvDir = gd.getNextString();
         minCellVol = gd.getNextNumber();
         maxCellVol = gd.getNextNumber();
         minCellInt = gd.getNextNumber();
@@ -326,8 +320,6 @@ public class Tools {
         nbRandomSamples = (int)gd.getNextNumber();
         
         vessel = gd.getNextBoolean();
-        dogSigma1 = gd.getNextNumber();
-        dogSigma2 = gd.getNextNumber();
         vesselThMet = gd.getNextChoice();
         minVesselVol = gd.getNextNumber();
         roiDilation = gd.getNextNumber();
@@ -362,11 +354,11 @@ public class Tools {
         if(reader.getSeriesCount() == 1) {
             return(1);
         } else {
-            reader.setSeries(0);
-            int sizeXseries0 = reader.getSizeX();
-            reader.setSeries(2);
+            reader.setSeries(imgSeries);
+            int sizeXseries1 = reader.getSizeX();
+            reader.setSeries(roiSeries);
             int sizeXseries2 = reader.getSizeX();
-            return (sizeXseries0 / sizeXseries2);
+            return (sizeXseries1 / sizeXseries2);
         }
     }
     
@@ -377,9 +369,7 @@ public class Tools {
      * - let CellPose reconstruct cells in 3D using the stitch threshold parameters
      */
     public ImagePlus cellposeDetection(ImagePlus imgIn) throws IOException{
-        // Resize image
-       double resizeFactor = 1;
-       ImagePlus img = imgIn.resize((int)(imgIn.getWidth()*resizeFactor), (int)(imgIn.getHeight()*resizeFactor), 1, "none");
+       ImagePlus img = imgIn.duplicate();
        
        // Define CellPose settings
        CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel, 1, cellposeDiam, cellposeEnvDir);
@@ -411,6 +401,7 @@ public class Tools {
        // Filter detections
        Objects3DIntPopulation pop = new Objects3DIntPopulation(ImageInt.wrap(img));
        pop = centroidFilter(pop, roi);
+       zFilter(pop);
        System.out.println(pop.getNbObjects() + " cells detected in ROI");
        pop = new Objects3DIntPopulationComputation(pop).getFilterSize(minCellVol/pixelVol, maxCellVol/pixelVol);
        System.out.println(pop.getNbObjects() + " cells remaining after size filtering");
@@ -439,6 +430,14 @@ public class Tools {
     
     
     /**
+     * Remove objects that appear in only one z-slice
+     */
+    public void zFilter(Objects3DIntPopulation pop) {
+        pop.getObjects3DInt().removeIf(p -> (p.getObject3DPlanes().size() == 1));
+    }
+    
+    
+    /**
      * Filter objects in population by intensity
      */
     public Objects3DIntPopulation intensityFilter(Objects3DIntPopulation pop, ImagePlus img, double intTh) {
@@ -458,10 +457,10 @@ public class Tools {
      */
     public ImagePlus vesselsDetection(ImagePlus img) {
         ImagePlus imgTh;
-        ImagePlus imgMed = medianFilter(img, 2, 2);
+        ImagePlus imgMed = medianFilter(img, 4);
         ImagePlus imgDOG = DOG(imgMed, dogSigma1, dogSigma2);
         ImagePlus imgBin = threshold(imgDOG, vesselThMet, true);
-        imgTh = medianFilter(imgBin, 4, 4);
+        imgTh = medianFilter(imgBin, 4);
 
         closeImage(imgMed);
         closeImage(imgDOG);
@@ -486,6 +485,20 @@ public class Tools {
         return imgFilter.getImagePlus();
     }
           
+    
+    /**
+     * Median filter using CLIJ
+     */ 
+    public ImagePlus medianFilter(ImagePlus img, double sizeXY) {
+       ClearCLBuffer imgCL = clij2.push(img);
+       ClearCLBuffer imgCLMed = clij2.create(imgCL);
+       clij2.median3DSliceBySliceSphere(imgCL, imgCLMed, sizeXY, sizeXY);
+       clij2.release(imgCL);
+       ImagePlus imgMed = clij2.pull(imgCLMed);
+       clij2.release(imgCLMed);
+       return(imgMed);
+    }
+    
       
     /**
      * Difference of Gaussians using CLIJ
@@ -493,7 +506,7 @@ public class Tools {
     public ImagePlus DOG(ImagePlus img, double size1, double size2) {
         ClearCLBuffer imgCL = clij2.push(img);
         ClearCLBuffer imgCLDOG = clij2.create(imgCL);
-        clij2.differenceOfGaussian3D(imgCL, imgCLDOG, size1, size1, size1, size2, size2, size2);
+        clij2.differenceOfGaussian2D(imgCL, imgCLDOG, size1, size1, size2, size2);
         clij2.release(imgCL);
         ImagePlus imgDOG = clij2.pull(imgCLDOG); 
         clij2.release(imgCLDOG);
@@ -534,21 +547,7 @@ public class Tools {
         }
         return(zmax);
     }
-    
-    
-    /**
-     * Median filter using CLIJ
-     */ 
-    public ImagePlus medianFilter(ImagePlus img, double sizeXY, double sizeZ) {
-       ClearCLBuffer imgCL = clij2.push(img);
-       ClearCLBuffer imgCLMed = clij2.create(imgCL);
-       clij2.median3DBox(imgCL, imgCLMed, sizeXY, sizeXY, sizeZ);
-       clij2.release(imgCL);
-       ImagePlus imgMed = clij2.pull(imgCLMed);
-       clij2.release(imgCLMed);
-       return(imgMed);
-    }
-    
+        
     
     /**
      * Compute distance map or inverse distance map
@@ -577,17 +576,16 @@ public class Tools {
     /**
      * Get vessels in dilated ROI
      */
-    public Objects3DIntPopulation getVesselsInRoi(ImagePlus imgTh, Roi roi) {
+    public Object3DInt getVesselsInRoi(ImagePlus imgTh, Roi roi, boolean dilate) {
         ImagePlus img = imgTh.duplicate();
-        Roi roiDilated = RoiEnlarger.enlarge(roi, roiDilation/cal.pixelWidth);
-        img.setRoi(roiDilated);
+        img.setRoi(dilate ? RoiEnlarger.enlarge(roi, roiDilation/cal.pixelWidth) : roi);
         IJ.setBackgroundColor(0, 0, 0);
         IJ.run(img, "Clear Outside", "stack");
         img.setCalibration(cal);        
         
-        Objects3DIntPopulation pop = new Objects3DIntPopulation(ImageHandler.wrap(img));
+        Object3DInt obj = new Object3DInt(ImageHandler.wrap(img));
         closeImage(img);
-        return pop;
+        return obj;
     }
     
     
@@ -637,12 +635,31 @@ public class Tools {
     
     
     /**
+     * Draw results obtained in roi
+     * tools.drawResultsInRoi(cellPop, vesselPop, imhCells, imhCellsDist, imhVessels, dist, outDirResults+rootName+"_"+roi.getName());
+     */
+    public void drawResultsInRoi(Objects3DIntPopulation cellPop, Object3DInt vesselObj, ImageHandler imhCell, ImageHandler imhCellDist, ImageHandler imhVessel, ArrayList<Double> dists) {
+        // Cells
+        cellPop.drawInImage(imhCell);
+        
+        // Cells + vessels
+        if (vessel) {
+            int i = 0;
+            for (Object3DInt cell: cellPop.getObjects3DInt()) {
+                double dist = dists.get(i);
+                cell.drawObject(imhCellDist, (float)(dist+10));
+                i++;
+            }
+            vesselObj.drawObject(imhVessel, 255);
+        }
+    }
+    
+    
+    /**
      * Save results in images
      */
-    public void drawResults(Objects3DIntPopulation cellPop, Objects3DIntPopulation vesselPop, ImagePlus imgCell, ImagePlus imgVessel, ArrayList<Double> dists, String pathName) {
+    public void drawResults(ImagePlus imgCell, ImagePlus imgVessel, ImageHandler imhCell, ImageHandler imhCellDist, ImageHandler imhVessel, String pathName) {
         // Cells
-        ImageHandler imhCell = ImageHandler.wrap(imgCell).createSameDimensions();
-        cellPop.drawInImage(imhCell);
         ImagePlus[] imgColors1 = {imhCell.getImagePlus(), null, null, imgCell};
         ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, true);
         imgObjects1.setCalibration(cal);
@@ -654,21 +671,11 @@ public class Tools {
         
         // Cells + vessels
         if (vessel) {
-            ImageHandler imhCellDist = ImageHandler.wrap(imgCell).createSameDimensions();
-            int i = 0;
-            for (Object3DInt cell : cellPop.getObjects3DInt()) {
-                double dist = dists.get(i);
-                cell.drawObject(imhCellDist, (float)(dist+10));
-                i++;
-            }
             ImagePlus imgCellDist = imhCellDist.getImagePlus();
             IJ.run(imgCellDist, "mpl-inferno", "");
             //IJ.run(imgCellDist,"Calibrate...","function=None unit="+cal.getUnit());
             //IJ.run(imgCellDist, "Calibration Bar...", "location=[Upper Right] fill=White label=Black number=5 decimal=2 font=12 zoom=5 overlay show");
             
-            ImageHandler imhVessel = imhCellDist.createSameDimensions();
-            for (Object3DInt ob : vesselPop.getObjects3DInt()) 
-                ob.drawObject(imhVessel, 255);
             IJ.run(imhVessel.getImagePlus(), "Blue", "");
             
             ImagePlus[] imgColors2 = {imgCellDist, null, imhVessel.getImagePlus(), imgVessel};
@@ -684,6 +691,7 @@ public class Tools {
     }
     
     
+
     /**
      * Write headers in results files
      */
@@ -691,21 +699,21 @@ public class Tools {
         // Global results
         FileWriter fileGlobal = new FileWriter(outDirResults + "globalResults.xls", false);
         outPutGlobal = new BufferedWriter(fileGlobal);
-        outPutGlobal.write("Image name\tROI name\tROI area\tROI volume\tNb cells\tCells mean intensity\tCells intensity SD\t"
-                + "Cells mean volume\tCells volume SD\tCells total volume\tCells mean distance to closest neighbor\t"
-                + "Cells distance to closest neighbor SD\tCells mean distance to "+nbNei+" closest neighbors\t"
-                + "Cells distance to "+nbNei+" closest neighbors SD"+"\tCells mean of max distance to "+nbNei+" neighbors\t"+
-                "Cells SD of max distance to "+nbNei+" neighbors");
+        outPutGlobal.write("Image name\tROI name\tROI area (µm²)\tROI volume (µm³)\tNb cells\tCells mean intensity\tCells intensity SD\t"
+                + "Cells mean volume (µm³)\tCells volume SD (µm³)\tCells total volume (µm³)\tCells mean distance to closest neighbor (µm)\t"
+                + "Cells distance to closest neighbor SD (µm)\tCells mean distance to "+nbNei+" closest neighbors (µm)\t"
+                + "Cells distance to "+nbNei+" closest neighbors SD (µm)"+"\tCells mean of max distance to "+nbNei+" neighbors (µm)\t"+
+                "Cells SD of max distance to "+nbNei+" neighbors (µm)");
         if (computeGFunction) outPutGlobal.write("\tCells G-function SDI\tCells G-function AUC difference");
-        if (vessel) outPutGlobal.write("\tCells mean distance to closest vessel\tVessels mean radius");
+        if (vessel) outPutGlobal.write("\tCells mean distance to closest vessel (µm)\tVessels mean radius (µm)\tVessels total volume (µm³)");
         outPutGlobal.write("\n");
         outPutGlobal.flush();
 
         // Detailed results
         FileWriter fileDetail = new FileWriter(outDirResults +"detailedResults.xls", false);
         outPutDetail = new BufferedWriter(fileDetail);
-        outPutDetail.write("Image name\tROI name\tCell ID\tCell volume\tCell mean intensity\tCell distance to closest neighbor\tCell mean distance to "+nbNei+" closest neighbors\tCell max distance to "+nbNei+" closest neighbors");
-        if(vessel) outPutDetail.write("\tCell distance to closest vessel\tClosest vessel radius");
+        outPutDetail.write("Image name\tROI name\tCell ID\tCell volume (µm³)\tCell mean intensity\tCell distance to closest neighbor (µm)\tCell mean distance to "+nbNei+" closest neighbors (µm)\tCell max distance to "+nbNei+" closest neighbors (µm)");
+        if(vessel) outPutDetail.write("\tCell distance to closest vessel (µm)\tClosest vessel radius (µm)");
         outPutDetail.write("\n");
         outPutDetail.flush();
     }
@@ -715,7 +723,7 @@ public class Tools {
      * Compute parameters and save them in results files
      * @throws java.io.IOException
      */
-    public void writeResults(Objects3DIntPopulation cellPop, Objects3DIntPopulation vesselPop, ArrayList<Double> dist, ArrayList<Double> radius, ImagePlus imgCell, String roiName, Roi roi,
+    public void writeResults(Objects3DIntPopulation cellPop, ArrayList<Double> dist, ArrayList<Double> radius, double vesselVol, ImagePlus imgCell, String roiName, Roi roi,
         String imgName, String outDirResults) throws IOException {
         
         ImageHandler imhCell = ImageHandler.wrap(imgCell);
@@ -789,7 +797,7 @@ public class Tools {
         if (vessel) {
             double vesselDistMean = dist.stream().mapToDouble(val -> val).average().orElse(0.0);
             double vesselRadiusMean = radius.stream().mapToDouble(val -> val).average().orElse(0.0);
-            outPutGlobal.write("\t"+vesselDistMean+"\t"+vesselRadiusMean);
+            outPutGlobal.write("\t"+vesselDistMean+"\t"+vesselRadiusMean+"\t"+vesselVol);
         }
         outPutGlobal.write("\n");
         outPutGlobal.flush();
