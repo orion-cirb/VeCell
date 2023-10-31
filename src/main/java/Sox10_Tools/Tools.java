@@ -697,7 +697,7 @@ public class Tools {
      */
     public void writeHeaders(String outDirResults) throws IOException {
         // Global results
-        FileWriter fileGlobal = new FileWriter(outDirResults + "globalResults.xls", false);
+        FileWriter fileGlobal = new FileWriter(outDirResults + "globalResults.csv", false);
         outPutGlobal = new BufferedWriter(fileGlobal);
         outPutGlobal.write("Image name\tROI name\tROI area (µm²)\tROI volume (µm³)\tNb cells\tCells mean intensity\tCells intensity SD\t"
                 + "Cells mean volume (µm³)\tCells volume SD (µm³)\tCells total volume (µm³)\tCells mean distance to closest neighbor (µm)\t"
@@ -710,7 +710,7 @@ public class Tools {
         outPutGlobal.flush();
 
         // Detailed results
-        FileWriter fileDetail = new FileWriter(outDirResults +"detailedResults.xls", false);
+        FileWriter fileDetail = new FileWriter(outDirResults +"detailedResults.csv", false);
         outPutDetail = new BufferedWriter(fileDetail);
         outPutDetail.write("Image name\tROI name\tCell ID\tCell volume (µm³)\tCell mean intensity\tCell distance to closest neighbor (µm)\tCell mean distance to "+nbNei+" closest neighbors (µm)\tCell max distance to "+nbNei+" closest neighbors (µm)");
         if(vessel) outPutDetail.write("\tCell distance to closest vessel (µm)\tClosest vessel radius (µm)");
