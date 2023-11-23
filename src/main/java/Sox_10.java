@@ -2,7 +2,6 @@ import Sox10_Tools.Tools;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.plugin.Duplicator;
 import ij.plugin.frame.RoiManager;
 import ij.plugin.ImageCalculator;
