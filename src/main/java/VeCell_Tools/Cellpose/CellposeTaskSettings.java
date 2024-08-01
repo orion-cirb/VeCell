@@ -1,4 +1,4 @@
-package Sox10_Tools.Cellpose;
+package VeCell_Tools.Cellpose;
 
 
 public class CellposeTaskSettings {

@@ -1,6 +1,6 @@
-package Sox10_Tools.Cellpose;
+package VeCell_Tools.Cellpose;
 
-import Sox10_Tools.Cellpose.CellposeTaskSettings;
+import VeCell_Tools.Cellpose.CellposeTaskSettings;
 import java.util.ArrayList;
 
 public class CellposeTask {

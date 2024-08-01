@@ -1,7 +1,7 @@
-package Sox10_Tools.Cellpose;
+package VeCell_Tools.Cellpose;
 
-import Sox10_Tools.Cellpose.CellposeTaskSettings;
-import Sox10_Tools.Cellpose.CellposeTask;
+import VeCell_Tools.Cellpose.CellposeTaskSettings;
+import VeCell_Tools.Cellpose.CellposeTask;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
