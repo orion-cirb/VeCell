@@ -889,13 +889,13 @@ public class Tools {
         } else {   
             double[] branchLengths = skelResult.getAverageBranchLength();
             int[] branchNumbers = skelResult.getBranches();
-            int totalLength = 0;
+            double totalLength = 0;
             for (int i = 0; i < branchNumbers.length; i++)
                 totalLength += branchNumbers[i] * branchLengths[i];
             
             DescriptiveStatistics diams = new DescriptiveStatistics();
             for (Point pt: skelResult.getListOfSlabVoxels())
-                diams.addValue(distMap.getPixel(pt.x, pt.y, pt.z)*2);
+                diams.addValue(2*distMap.getPixel(pt.x, pt.y, pt.z));
             
             resultsGlobal.write("\t"+cellsClosestVesselDist.getMean()+"\t"+vesselVol+"\t"+totalLength+"\t"+StatUtils.mean(branchLengths)+"\t"+
                                 IntStream.of(branchNumbers).sum()+"\t"+IntStream.of(skelResult.getJunctions()).sum()+"\t"+
