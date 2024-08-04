@@ -89,7 +89,7 @@ public class Tools {
     String[] chDialog = new String[]{"Astrocytes", "Vessels 1 (optional)", "Vessels 2 (optional)"};
     public int imgSeries = 0;
     public int roiScaling = 9;
-    private double roiDilation = 50; // um
+    public double roiDilation = 50; // um //TODO: bug when dilation bigger than image
     
     public String cellposeEnvDir = IJ.isWindows()? System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose" : "/opt/miniconda3/envs/cellpose";
     public final String cellposeModelDir = IJ.isWindows()? System.getProperty("user.home")+File.separator+".cellpose"+File.separator+"models"+File.separator : "";
@@ -291,8 +291,6 @@ public class Tools {
         
         gd.addMessage("ROIs", new Font("Monospace", Font.BOLD, 12), Color.blue);
         gd.addNumericField("Scaling factor: ", roiScaling, 0);
-        gd.addToSameRow();
-        gd.addNumericField("Dilation (µm): ", roiDilation, 2);
         
         gd.addMessage("Astrocytes detection", new Font("Monospace", Font.BOLD, 12), Color.blue);
         gd.addStringField("Cellpose model: ", cellposeModel);
@@ -343,7 +341,6 @@ public class Tools {
             roiScaling = 1;
             print("WARNING: ROIs cannot be scaled by zero or negative values, ROI scaling factor set to 1");
         }
-        roiDilation = gd.getNextNumber();
         
         cellposeModel = gd.getNextString();
         cellposeDiam = (int) gd.getNextNumber();
@@ -639,10 +636,11 @@ public class Tools {
     
     /**
      * Get object in (dilated) ROI
+     * @param dilationFactor in microns
      */
-    public ImagePlus getImgInRoi(ImagePlus img, Roi roi, boolean dilate) {
+    public ImagePlus getImgInRoi(ImagePlus img, Roi roi, double dilationFactor) {
         ImagePlus imgClear = img.duplicate();
-        imgClear.setRoi(dilate ? RoiEnlarger.enlarge(roi, roiDilation/cal.pixelWidth) : roi); // pixels
+        imgClear.setRoi(dilationFactor == 0? roi : RoiEnlarger.enlarge(roi, dilationFactor/cal.pixelWidth)); // pixels
         IJ.run(imgClear, "Clear Outside", "stack");
         imgClear.setCalibration(cal);
         return(imgClear);
@@ -652,8 +650,8 @@ public class Tools {
     /**
      * Get object in (dilated) ROI
      */
-    public Object3DInt getObjInRoi(ImagePlus img, Roi roi, boolean dilate) {
-        ImagePlus imgClear = getImgInRoi(img, roi, dilate);
+    public Object3DInt getObjInRoi(ImagePlus img, Roi roi, double dilationFactor) {
+        ImagePlus imgClear = getImgInRoi(img, roi, dilationFactor);
         Object3DInt obj = new Object3DInt(ImageHandler.wrap(imgClear));
         closeImage(imgClear);
         return(obj);
@@ -663,8 +661,8 @@ public class Tools {
     /**
      * Return population in ROI
      */
-    public Objects3DIntPopulation getPopInRoi(ImagePlus img, ImagePlus imgRaw, Roi roi, boolean dilate) throws IOException{
-        ImagePlus imgClear = getImgInRoi(img, roi, dilate);
+    public Objects3DIntPopulation getPopInRoi(ImagePlus img, ImagePlus imgRaw, Roi roi) throws IOException{
+        ImagePlus imgClear = getImgInRoi(img, roi, 20);
 
         // Filter detections
         Objects3DIntPopulation pop = new Objects3DIntPopulation(ImageInt.wrap(img));
@@ -742,7 +740,7 @@ public class Tools {
         // Cells + vessels
         if (objVessel != null) {
             for (Object3DInt cell: popCell.getObjects3DInt()) {
-                cell.drawObject(imhCellDist, (float)cell.getCompareValue()); // TODO: (float)(cell.getCompareValue()+10) ?
+                cell.drawObject(imhCellDist, (float)cell.getCompareValue()+10); // TODO: remove +10?
             }
             objVessel.drawObject(imhVessel, 255);
             objSkel.drawObject(imhSkel, 255);
@@ -826,7 +824,7 @@ public class Tools {
         
         // CELLS INDIVIDUAL STATISTICS
         print("Computing cells individual statistics...");
-        MeasurePopulationDistance allCellsDists = new MeasurePopulationDistance​(popCellRoi, popCellRoi, Double.POSITIVE_INFINITY, "DistCenterCenterUnit");
+        MeasurePopulationDistance allCellsDists = new MeasurePopulationDistance​(popCellRoi, popCellRoi, Double.POSITIVE_INFINITY, "DistCenterCenterUnit"); //TODO: other number than POSITIVE_INFINITY to fasten computation?
         for (Object3DInt cell: popCellRoi.getObjects3DInt()) {
             double cellVol = new MeasureVolume(cell).getVolumeUnit();
             cellsVolume.addValue(cellVol);
@@ -849,8 +847,8 @@ public class Tools {
             resultsDetail.write(imgName+"\t"+roi.getName()+"\t"+cell.getLabel()+"\t"+cellVol+"\t"+closestNeighborDist+"\t"+
                         closestNeighborsMeanDist+"\t"+closestNeighborsMaxDist);
             if (objSkelRoiDil != null) {
-                double diam = 2*distMap.getPixel(new Measure2Distance(cell, objSkelRoiDil).getBorder2Pix()); //TODO: in dilated roi, whereas dists in global image
-                resultsDetail.write("\t"+cell.getCompareValue()+"\t"+diam);
+                double diam = 2*distMap.getPixel(new Measure2Distance(cell, objSkelRoiDil).getBorder2Pix());  //TODO: vessel diam in dilated roi, whereas cell-vessel dist in global image?
+                resultsDetail.write("\t"+cell.getCompareValue()+"\t"+diam); 
             }
             resultsDetail.write("\n");
             resultsDetail.flush();
@@ -870,14 +868,15 @@ public class Tools {
             System.out.println("Computing G-function-related spatial distribution index...");
             Object3DInt mask = roiMask(imgCell, roi);
             double minDist = Math.pow(3*minCellVol/(4*Math.PI*pixelVol), 1/3) * 2; // min distance = 2 * min cell radius (in pixels)
-            String plotName = outDir + imgName + "_" + roi.getName() + "_Gplot.tif";
+            String plotName = outDir + imgName + "_" + roi.getName() + "_gfunction.tif";
             double[] res = computeSdiG(popCellRoi, mask, imgCell, minDist, nbRandomSamples, plotName);
             resultsGlobal.write("\t"+res[0]+"\t"+res[1]);
         }
         
         // VESSELS STATISTICS
         ImageHandler imhSkel = ImageHandler.wrap(imgCell).createSameDimensions();
-        objSkelRoi.drawObject(imhSkel, 255);
+        if(objSkelRoi != null)
+            objSkelRoi.drawObject(imhSkel, 255);
         IJ.run(imhSkel.getImagePlus(), "8-bit","");
 
         AnalyzeSkeleton_ analyzeSkeleton = new AnalyzeSkeleton_();

@@ -163,16 +163,16 @@ public class VeCell implements PlugIn {
                     tools.print("- Computing parameters and saving results for ROI " + roi.getName() + " -");
 
                     // Cells channel
-                    Objects3DIntPopulation popCellRoi = tools.getPopInRoi(imgCellMask, imgCell, roi, false); //todo
+                    Objects3DIntPopulation popCellRoi = tools.getPopInRoi(imgCellMask, imgCell, roi);
                     
                     // Vessels channel
                     double vesselVolRoi = 0;
                     Object3DInt objVesselRoiDil = null, objSkelRoi = null, objSkelRoiDil = null;
                     if (imgVessel != null){
-                        vesselVolRoi = new MeasureVolume(tools.getObjInRoi(imgVesselMask, roi, false)).getVolumeUnit();
-                        objVesselRoiDil = tools.getObjInRoi(imgVesselMask, roi, true);
-                        objSkelRoi = tools.getObjInRoi(imgVesselSkel, roi, false);
-                        objSkelRoiDil = tools.getObjInRoi(imgVesselSkel, roi, true);
+                        vesselVolRoi = new MeasureVolume(tools.getObjInRoi(imgVesselMask, roi, 0)).getVolumeUnit();
+                        objVesselRoiDil = tools.getObjInRoi(imgVesselMask, roi, tools.roiDilation);
+                        objSkelRoi = tools.getObjInRoi(imgVesselSkel, roi, 0);
+                        objSkelRoiDil = tools.getObjInRoi(imgVesselSkel, roi, tools.roiDilation);
 
                         tools.print("Computing distance between each cell and its closest vessel...");
                         tools.computeCellsVesselsDists(popCellRoi, imgVesselDistMapInv);

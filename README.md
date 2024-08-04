@@ -1,45 +1,48 @@
-# Sox_10
+# VeCell
 
 * **Developed for:** Naomie
 * **Team:** Cohen-Salmon
-* **Date:** April 2023
+* **Date:** August 2024
 * **Software:** Fiji
 
 
 ### Images description
 
-3D images taken with a 1.6x objective on an AxioZoom microscope.
+3D images taken on an AxioZoom microscope.
 
 3 channels:
-  1. *EGFP:* Vessels
-  2. *DsRed:* Sox9 cells
-  3. *Cy5:* Vessels (optional)
+  1. *DsRed:* Astrocytes (mandatory)
+  2. *Cy5:* Vessels 1 (optional)
+  3. *EGFP:* Vessels 2 (optional)
   
-A *.roi* or *.zip* file containing ROI(s) must be provided with each image.
+With each image, a *.roi* or *.zip* file containing one or multiple ROIs should be provided; otherwise, the image is not analyzed.
 
 ### Plugin description
 
 In each ROI:
-* Detect cells with Cellpose
-* Compute the distance between each cell and its neighbors
-* Compute the G-function related spatial distribution index of the population of cells
-* Detect vessels with median filtering + DoG filtering + thresholding + median filtering
-* Compute the vessels 3D skeleton, 3D distance map and 3D inverse distance map
-* Get the distance between each cell and its nearest vessel using the inverse distance map
-* Compute the radius of the corresponding vessels using the vessels skeleton and distance map
-* Give vessels volume and cells volume and intensity
+* Detect astrocytes with Cellpose
+* Compute distance between each cell and its nearest neighbors
+* Compute G-function related spatial distribution index of the population of cells
+* If vessels channel provided:
+  * Detect vessels with median filtering + DoG filtering + thresholding + closing filtering + median filtering
+  * Compute vessels skeleton and provide vessels diameter, length, branches number, and junctions number
+  * Compute distance between each cell and its nearest vessel
+
 
 ### Dependencies
 
 * **3DImageSuite** Fiji plugin
-* **CLIJ** Fiji plugin
-* **Cellpose** conda environment + *cyto* model
+* **CLIJ2** Fiji plugin
+* **Cellpose** conda environment + *cyto* pretrained model or another fine-tuned model
 
 ### Version history
 
-Version 4 released on October 31, 2023.
+Version 5 released on August 4, 2024.
 
-Small improvements compared to version 3:
-* Adapted cells and vessels detection to smaller resolution of the images (1.6x objective instead of 2.3x)
-* Added vessels total volume in each ROI in globalResults.csv file
-* Results for each ROI drawn in same image
+Improvements compared to version 4:
+* Plugin renamed
+* Code cleaned
+* Dialog box changed
+* Vessels segmentation improved: 2 DoG filters can be applied if thin and thick vessels appear in the image
+* Vessels skeleton branches filtered out by length
+* Vessels skeleton length, branches number, and junctions number provided
