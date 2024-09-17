@@ -454,8 +454,7 @@ public class Tools {
        ImagePlus img = imgIn.duplicate();
        
        // Define Cellpose settings
-       if(!cellposeModel.equals("cyto")) cellposeModel = cellposeModelDir+cellposeModel; // need to add Cellpose models folder path if own model (for Windows only, not Linux)
-       CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel, 1, cellposeDiam, cellposeEnvDir);
+       CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel.equals("cyto")? cellposeModel : cellposeModelDir+cellposeModel, 1, cellposeDiam, cellposeEnvDir); // need to add Cellpose models folder path if own model (for Windows only, not Linux)
        settings.setStitchThreshold(cellposeStitchTh);
        settings.useGpu(true);
        
