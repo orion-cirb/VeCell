@@ -14,13 +14,11 @@ import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import loci.common.Region;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
 import loci.formats.FormatException;
 import loci.formats.MetadataTools;
 import loci.formats.meta.IMetadata;
-import loci.plugins.BF;
 import loci.plugins.in.ImporterOptions;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom2.Object3DInt;
@@ -102,22 +100,16 @@ public class VeCell implements PlugIn {
                 if (rawRois == null) continue;
                 
                 List<Roi> rois = tools.scaleRois(rawRois, tools.roiScaling);
-                Region bBox = tools.getBoundingBox(rois);
+                Roi bBox = tools.getBoundingBox(rois);
                 tools.translateRois(rois, bBox);
                 
                 ImporterOptions options = new ImporterOptions();
                 options.setId(f);
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-                options.setCrop(true);
-                options.setCropRegion(0, bBox);
-                options.doCrop();
                 
                  // Astrocytes channel
                 tools.print("- Opening astrocytes channel -");
-                int chIndex = ArrayUtils.indexOf(chMeta, chOrder[0]);                
-                options.setCBegin(tools.imgSeries, chIndex);
-                options.setCEnd(tools.imgSeries, chIndex);
-                ImagePlus imgCell = BF.openImagePlus(options)[0];
+                ImagePlus imgCell = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[0]), bBox);
                 
                 tools.print("- Detecting astrocytes -");
                 ImagePlus imgCellMask = tools.cellposeDetection(imgCell);
@@ -127,15 +119,9 @@ public class VeCell implements PlugIn {
                 ImageFloat imgVesselDistMap = null, imgVesselDistMapInv = null;
                 if (!chOrder[1].equals("None")){
                     tools.print("- Opening vessels channels -");
-                    chIndex = ArrayUtils.indexOf(chMeta, chOrder[1]);
-                    options.setCBegin(tools.imgSeries, chIndex);
-                    options.setCEnd(tools.imgSeries, chIndex);
-                    imgVessel = BF.openImagePlus(options)[0];
+                    imgVessel = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[1]), bBox);
                     if (!chOrder[2].equals("None")) {
-                        chIndex = ArrayUtils.indexOf(chMeta, chOrder[2]);
-                        options.setCBegin(tools.imgSeries, chIndex);
-                        options.setCEnd(tools.imgSeries, chIndex);
-                        ImagePlus imgVessel2 = BF.openImagePlus(options)[0];
+                        ImagePlus imgVessel2 = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[2]), bBox);
                         // Add two vessels channels
                         new ImageCalculator().run("Add stack", imgVessel, imgVessel2);
                         tools.closeImage(imgVessel2);
@@ -192,9 +178,9 @@ public class VeCell implements PlugIn {
                 if (imgVessel != null){
                     tools.closeImage(imgVessel);
                     tools.closeImage(imgVesselMask);
+                    tools.closeImage(imgVesselSkel);
                     tools.closeImage(imgVesselDistMap.getImagePlus());
                     tools.closeImage(imgVesselDistMapInv.getImagePlus());
-                    tools.closeImage(imgVesselSkel);
                 }
             }
             tools.closeResults();

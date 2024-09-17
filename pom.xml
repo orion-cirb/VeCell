@@ -17,11 +17,15 @@
     <packaging>jar</packaging>
     
     <name>VeCell</name>
-    <description> 
-        Detect astrocytic cells with Cellpose
-        Compute distance between each cell and its neighbors + G-function related spatial distribution index of the population of cells
-        Detect vessels with median filtering + DoG filtering + thresholding + median filtering
-        Get the distance between each cell and its nearest vessel using the inverse distance map
+    <description>
+        In each ROI:
+            - Detect astrocytes with Cellpose 
+            - Compute distance between each cell and its neighbors
+            - Compute G-function related spatial distribution index of the population of cells
+            - If vessels channel provided: 
+                - Detect vessels with median filtering + DoG filtering + thresholding + closing filtering + median filtering
+                - Compute vessels skeleton and provide vessels diameter, length, branches number, and junctions number
+                - Compute distance between each cell and its nearest vessel
     </description>
     <url>https://github.com/orion-cirb/VeCell</url>
     <inceptionYear>2022</inceptionYear>
@@ -90,10 +94,10 @@
     <dependencies>
         <!-- 3D Image Suite -->
         <dependency>
-            <groupId>mcib</groupId>
+            <groupId>org.framagit.mcib3d</groupId>
             <artifactId>mcib3d-core</artifactId>
-            <version>4.0.93</version>
-         </dependency>
+            <version>4.1.7</version>		
+        </dependency>
         <!-- CLIJ -->
         <dependency>
             <groupId>net.haesleinhuepf</groupId>

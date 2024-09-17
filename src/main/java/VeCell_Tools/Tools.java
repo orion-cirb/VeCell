@@ -32,11 +32,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
 import javax.swing.ImageIcon;
-import loci.common.Region;
 import loci.common.services.DependencyException;
 import loci.common.services.ServiceException;
 import loci.formats.FormatException;
 import loci.formats.meta.IMetadata;
+import loci.plugins.BF;
+import loci.plugins.in.ImporterOptions;
 import loci.plugins.util.ImageProcessorReader;
 import mcib3d.geom.Object3D;
 import mcib3d.geom.Objects3DPopulation;
@@ -89,27 +90,26 @@ public class Tools {
     String[] chDialog = new String[]{"Astrocytes", "Vessels 1 (optional)", "Vessels 2 (optional)"};
     public int imgSeries = 0;
     public int roiScaling = 9;
-    public double roiDilation = 50; // um //TODO: bug when dilation bigger than image
+    public double roiDilation = 50; // um
     
     public String cellposeEnvDir = IJ.isWindows()? System.getProperty("user.home")+File.separator+"miniconda3"+File.separator+"envs"+File.separator+"CellPose" : "/opt/miniconda3/envs/cellpose";
     public final String cellposeModelDir = IJ.isWindows()? System.getProperty("user.home")+File.separator+".cellpose"+File.separator+"models"+File.separator : "";
-    public String cellposeModel = "cyto";
+    public String cellposeModel = "cyto_sox9_naomie";
     public int cellposeDiam = 20;
     public double cellposeStitchTh = 0.5;
     public double minCellVol = 300; // um3
     public double maxCellVol = 3000; // um3
-    public double minCellInt = 1500;
     
     private int nbNei = 10; // K-nearest neighbors
     private boolean computeGFunction = false;
     private int nbRandomSamples = 50;
     
-    private double dog1Sigma1 = 7;
-    private double dog1Sigma2 = 14;
+    private double dog1Sigma1 = 4;
+    private double dog1Sigma2 = 8;
     private String vesselThMet1 = "Triangle";
-    private boolean dog2 = false;
-    private double dog2Sigma1 = 10;
-    private double dog2Sigma2 = 20;
+    private boolean dog2 = true;
+    private double dog2Sigma1 = 7;
+    private double dog2Sigma2 = 14;
     private String vesselThMet2 = "Triangle";
     public double minVesselVol = 600; // um3
     private double minVesselLength = 10; // um
@@ -299,7 +299,6 @@ public class Tools {
         gd.addNumericField("Min volume (µm3): ", minCellVol, 2);
         gd.addToSameRow();
         gd.addNumericField("Max volume (µm3): ", maxCellVol, 2);
-        gd.addNumericField("Min intensity: ", minCellInt, 2);
         
         gd.addMessage("Astrocytes spatial distribution", new Font("Monospace", Font.BOLD, 12), Color.blue);
         gd.addNumericField("Neighbors nb: ", nbNei, 0);
@@ -346,7 +345,6 @@ public class Tools {
         cellposeDiam = (int) gd.getNextNumber();
         minCellVol = gd.getNextNumber();
         maxCellVol = gd.getNextNumber();
-        minCellInt = gd.getNextNumber();
         
         nbNei = (int)gd.getNextNumber();
         computeGFunction = gd.getNextBoolean();
@@ -406,7 +404,7 @@ public class Tools {
     /**
      * Get bounding box of multiple dilated ROIs combined together
      */
-    public Region getBoundingBox(List<Roi> rois) {
+    public Roi getBoundingBox(List<Roi> rois) {
         Rectangle rect0 = RoiEnlarger.enlarge(rois.get(0), roiDilation/cal.pixelWidth).getBounds();
         int minX = rect0.x, minY = rect0.y, maxX = rect0.x+rect0.width, maxY = rect0.y+rect0.height;
         for (Roi roi : rois) {
@@ -416,18 +414,34 @@ public class Tools {
             if(rect.x+rect.width > maxX) maxX = rect.x+rect.width;
             if(rect.y+rect.height > maxY) maxY = rect.y+rect.height;
         }
-        return new Region(minX, minY, maxX-minX, maxY-minY);
+        minX = Math.max(minX, 0);
+        minY = Math.max(minY, 0);
+        return new Roi(minX, minY, maxX-minX, maxY-minY);
     }
     
     
     /**
      * Translate ROIs
      */
-    public void translateRois(List<Roi> rois, Region rectOrigin) {
+    public void translateRois(List<Roi> rois, Roi bBox) {
+        Rectangle rectBBox = bBox.getBounds();
         for (Roi roi: rois) {
             Rectangle rectRoi = roi.getBounds();
-            roi.setLocation(rectRoi.x-rectOrigin.x, rectRoi.y-rectOrigin.y);
+            roi.setLocation(rectRoi.x-rectBBox.x, rectRoi.y-rectBBox.y);
         }
+    }
+    
+    
+    public ImagePlus openChannel(ImporterOptions options, int series, int channel, Roi roi) throws FormatException, IOException {
+        options.setCBegin(series, channel);
+        options.setCEnd(series, channel);
+        ImagePlus img = BF.openImagePlus(options)[0];
+        
+        img.setRoi(roi);
+        img.crop();
+        img.deleteRoi();
+        
+        return(img);
     }
     
     
@@ -470,7 +484,7 @@ public class Tools {
             closeImage(imgBin2);
         }
         ImagePlus imgClose = closingFilter3D(imgBin, 8, 1);
-        ImagePlus imgOut = medianFilter3D(imgBin, 1, 1);
+        ImagePlus imgOut = medianFilter3D(imgClose, 1, 1);
 
         ImageInt imgLabels = new ImageLabeller().getLabels(ImageHandler.wrap(imgOut));
         imgLabels.setCalibration(cal);
@@ -484,7 +498,7 @@ public class Tools {
         ImageHandler imgFilter = ImageHandler.wrap(img).createSameDimensions();
         for(Object3DInt obj: pop.getObjects3DInt())
             obj.drawObject(imgFilter, 255);
-        imgOut.setCalibration(cal);
+        imgFilter.setCalibration(cal);
         
         closeImage(imgMed);
         closeImage(imgDOG);
@@ -574,7 +588,7 @@ public class Tools {
     public ImagePlus skeletonize3D(ImagePlus img) {
         ClearCLBuffer imgCL = clij2.push(img);
         ClearCLBuffer imgCLSkel = clij2.create(imgCL);
-        new BoneJSkeletonize3D().bonejSkeletonize3D(clij2,imgCL, imgCLSkel);
+        new BoneJSkeletonize3D().bonejSkeletonize3D(clij2, imgCL, imgCLSkel);
         ImagePlus imgSkel = clij2.pull(imgCLSkel);
         clij2.release(imgCL);
         clij2.release(imgCLSkel);
@@ -671,8 +685,6 @@ public class Tools {
         System.out.println(pop.getNbObjects() + " cells detected in ROI");
         popFilterVol(pop, minCellVol, maxCellVol);
         System.out.println(pop.getNbObjects() + " cells remaining after size filtering");
-        popFilterInt(pop, imgRaw, minCellInt); 
-        System.out.println(pop.getNbObjects() + " cells remaining after intensity filtering");
         pop.resetLabels();
 
         closeImage(imgClear);
@@ -740,7 +752,7 @@ public class Tools {
         // Cells + vessels
         if (objVessel != null) {
             for (Object3DInt cell: popCell.getObjects3DInt()) {
-                cell.drawObject(imhCellDist, (float)cell.getCompareValue()+10); // TODO: remove +10?
+                cell.drawObject(imhCellDist, (float)cell.getCompareValue());
             }
             objVessel.drawObject(imhVessel, 255);
             objSkel.drawObject(imhSkel, 255);
@@ -824,7 +836,7 @@ public class Tools {
         
         // CELLS INDIVIDUAL STATISTICS
         print("Computing cells individual statistics...");
-        MeasurePopulationDistance allCellsDists = new MeasurePopulationDistance​(popCellRoi, popCellRoi, Double.POSITIVE_INFINITY, "DistCenterCenterUnit"); //TODO: other number than POSITIVE_INFINITY to fasten computation?
+        MeasurePopulationDistance allCellsDists = new MeasurePopulationDistance​(popCellRoi, popCellRoi, Double.POSITIVE_INFINITY, "DistCenterCenterUnit");
         for (Object3DInt cell: popCellRoi.getObjects3DInt()) {
             double cellVol = new MeasureVolume(cell).getVolumeUnit();
             cellsVolume.addValue(cellVol);
@@ -836,7 +848,7 @@ public class Tools {
             cellsClosestNeighborDist.addValue(closestNeighborDist);
             
             DescriptiveStatistics cellNeighborsDists = new DescriptiveStatistics();
-            for (int d=1; d <= nbNei; d++)
+            for (int d=1; d <= Math.min(nbNei, popCellRoi.getNbObjects()-1); d++)
                 cellNeighborsDists.addValue(cellCellsDists.get(d).getPairValue());
             
             double closestNeighborsMeanDist = cellNeighborsDists.getMean();
@@ -847,13 +859,12 @@ public class Tools {
             resultsDetail.write(imgName+"\t"+roi.getName()+"\t"+cell.getLabel()+"\t"+cellVol+"\t"+closestNeighborDist+"\t"+
                         closestNeighborsMeanDist+"\t"+closestNeighborsMaxDist);
             if (objSkelRoiDil != null) {
-                double diam = 2*distMap.getPixel(new Measure2Distance(cell, objSkelRoiDil).getBorder2Pix());  //TODO: vessel diam in dilated roi, whereas cell-vessel dist in global image?
+                double diam = 2*distMap.getPixel(new Measure2Distance(cell, objSkelRoiDil).getBorder2Pix());
                 resultsDetail.write("\t"+cell.getCompareValue()+"\t"+diam); 
             }
             resultsDetail.write("\n");
             resultsDetail.flush();
         }
-        
           
         // CELLS GLOBAL STATISTICS
         print("Computing cells global statistics...");
@@ -874,33 +885,39 @@ public class Tools {
         }
         
         // VESSELS STATISTICS
-        ImageHandler imhSkel = ImageHandler.wrap(imgCell).createSameDimensions();
-        if(objSkelRoi != null)
-            objSkelRoi.drawObject(imhSkel, 255);
-        IJ.run(imhSkel.getImagePlus(), "8-bit","");
-
-        AnalyzeSkeleton_ analyzeSkeleton = new AnalyzeSkeleton_();
-        analyzeSkeleton.setup("", imhSkel.getImagePlus());
-        SkeletonResult skelResult = analyzeSkeleton.run(AnalyzeSkeleton_.NONE, false, false, null, true, false);
-
-        if(skelResult.getBranches() == null) {
+        if(objSkelRoi == null) {
             resultsGlobal.write("\t0\t0\t0\t0\t0\t0\t0\t0");
             resultsGlobal.flush();
-        } else {   
-            double[] branchLengths = skelResult.getAverageBranchLength();
-            int[] branchNumbers = skelResult.getBranches();
-            double totalLength = 0;
-            for (int i = 0; i < branchNumbers.length; i++)
-                totalLength += branchNumbers[i] * branchLengths[i];
-            
-            DescriptiveStatistics diams = new DescriptiveStatistics();
-            for (Point pt: skelResult.getListOfSlabVoxels())
-                diams.addValue(2*distMap.getPixel(pt.x, pt.y, pt.z));
-            
-            resultsGlobal.write("\t"+cellsClosestVesselDist.getMean()+"\t"+vesselVol+"\t"+totalLength+"\t"+StatUtils.mean(branchLengths)+"\t"+
-                                IntStream.of(branchNumbers).sum()+"\t"+IntStream.of(skelResult.getJunctions()).sum()+"\t"+
-                                diams.getMean()+"\t"+diams.getStandardDeviation());
-            resultsGlobal.flush();
+        } else {
+            print("Computing vessels statistics...");
+            ImageHandler imhSkel = ImageHandler.wrap(imgCell).createSameDimensions();
+            objSkelRoi.drawObject(imhSkel, 255);
+            IJ.run(imhSkel.getImagePlus(), "8-bit","");
+
+            AnalyzeSkeleton_ analyzeSkeleton = new AnalyzeSkeleton_();
+            analyzeSkeleton.setup("", imhSkel.getImagePlus());
+            SkeletonResult skelResult = analyzeSkeleton.run(AnalyzeSkeleton_.NONE, false, false, null, true, false);
+            closeImage(imhSkel.getImagePlus());
+
+            if(skelResult.getBranches() == null) {
+                resultsGlobal.write("\t0\t0\t0\t0\t0\t0\t0\t0");
+                resultsGlobal.flush();
+            } else {   
+                double[] branchLengths = skelResult.getAverageBranchLength();
+                int[] branchNumbers = skelResult.getBranches();
+                double totalLength = 0;
+                for (int i = 0; i < branchNumbers.length; i++)
+                    totalLength += branchNumbers[i] * branchLengths[i];
+
+                DescriptiveStatistics diams = new DescriptiveStatistics();
+                for (Point pt: skelResult.getListOfSlabVoxels())
+                    diams.addValue(2*distMap.getPixel(pt.x, pt.y, pt.z));
+
+                resultsGlobal.write("\t"+cellsClosestVesselDist.getMean()+"\t"+vesselVol+"\t"+totalLength+"\t"+StatUtils.mean(branchLengths)+"\t"+
+                                    IntStream.of(branchNumbers).sum()+"\t"+IntStream.of(skelResult.getJunctions()).sum()+"\t"+
+                                    diams.getMean()+"\t"+diams.getStandardDeviation());
+                resultsGlobal.flush();
+            }
         }
         
         resultsGlobal.write("\n");
@@ -940,6 +957,7 @@ public class Tools {
         imgMask.setCalibration(cal);
         
         Object3DInt mask = new Object3DInt​(ImageHandler.wrap(imgMask));
+        closeImage(imgMask);
         return(mask);
     }
    
@@ -953,9 +971,11 @@ public class Tools {
         ImageHandler imhRoi = ImageHandler.wrap(img).createSameDimensions();
         roiInt.drawObject(imhRoi, 1);
         Object3D roi = new Objects3DPopulation(imhRoi).getObject(0);
+        closeImage(imhRoi.getImagePlus());
         ImageHandler imhPop = ImageHandler.wrap(img).createSameDimensions();
         popInt.drawInImage(imhPop);
         Objects3DPopulation pop = new Objects3DPopulation(imhPop);
+        closeImage(imhPop.getImagePlus());
         
         // Define spatial descriptor and model
         SpatialDescriptor spatialDesc = new G_Function();     
