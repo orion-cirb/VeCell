@@ -451,20 +451,22 @@ public class Tools {
      * - let CellPose reconstruct cells in 3D using the stitch_threshold parameter
      */
     public ImagePlus cellposeDetection(ImagePlus imgIn) throws IOException{
-       ImagePlus img = imgIn.duplicate();
+        ImagePlus img = imgIn.duplicate();
        
-       // Define Cellpose settings
-       CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel.equals("cyto")? cellposeModel : cellposeModelDir+cellposeModel, 1, cellposeDiam, cellposeEnvDir); // need to add Cellpose models folder path if own model (for Windows only, not Linux)
-       settings.setStitchThreshold(cellposeStitchTh);
-       settings.useGpu(true);
+        // Define Cellpose settings
+        CellposeTaskSettings settings = new CellposeTaskSettings(cellposeModel.equals("cyto")? cellposeModel : cellposeModelDir+cellposeModel, 1, cellposeDiam, cellposeEnvDir); // need to add Cellpose models folder path if own model (for Windows only, not Linux)
+        settings.setStitchThreshold(cellposeStitchTh);
+        settings.useGpu(true);
        
         // Run Cellpose
-       CellposeSegmentImgPlusAdvanced cellpose = new CellposeSegmentImgPlusAdvanced(settings, img);
-       ImagePlus imgOut = cellpose.run();
-       imgOut.setCalibration(cal);
+        CellposeSegmentImgPlusAdvanced cellpose = new CellposeSegmentImgPlusAdvanced(settings, img);
+        ImagePlus imgOut = cellpose.run();
+        if(imgOut.getNChannels() > 1) 
+            imgOut.setDimensions(1, imgOut.getNChannels(), 1);
+        imgOut.setCalibration(cal);
        
-       closeImage(img);
-       return imgOut;
+        closeImage(img);
+        return imgOut;
     }
     
     
