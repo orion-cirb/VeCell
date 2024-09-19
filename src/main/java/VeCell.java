@@ -1,8 +1,8 @@
+import VeCell_Tools.QuantileBasedNormalization;
 import VeCell_Tools.Tools;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
-import ij.plugin.ImageCalculator;
 import ij.plugin.PlugIn;
 import java.io.File;
 import java.io.IOException;
@@ -43,17 +43,17 @@ public class VeCell implements PlugIn {
                 return;
             }
             
-            String imageDir = IJ.getDirectory("Choose images folder");
-            if (imageDir == null) {
+            String imgDir = IJ.getDirectory("Choose images folder");
+            if (imgDir == null) {
                 return;
             }
             
             // Find extension of first image in input folder
-            String fileExt = tools.findImageType(new File(imageDir));
+            String fileExt = tools.findImageType(new File(imgDir));
             // Find all images with corresponding extension in folder
-            ArrayList<String> imageFiles = tools.findImages(imageDir, fileExt);
-            if (imageFiles.isEmpty()) {
-                IJ.showMessage("ERROR", "No image found with " + fileExt + " extension in " + imageDir + " folder");
+            ArrayList<String> imgFiles = tools.findImages(imgDir, fileExt);
+            if (imgFiles.isEmpty()) {
+                IJ.showMessage("ERROR", "No image found with " + fileExt + " extension in " + imgDir + " folder");
                 return;
             }
             
@@ -61,13 +61,13 @@ public class VeCell implements PlugIn {
             IMetadata meta = MetadataTools.createOMEXMLMetadata();
             ImageProcessorReader reader = new ImageProcessorReader();
             reader.setMetadataStore(meta);
-            reader.setId(imageFiles.get(0));
+            reader.setId(imgFiles.get(0));
             
             // Find image calibration
             tools.findImageCalib(meta);
 
             // Find channels name
-            String[] chMeta = tools.findChannels(imageFiles.get(0), meta, reader);
+            String[] chMeta = tools.findChannels(imgFiles.get(0), meta, reader);
             
             // Generate dialog box
             String[] chOrder = tools.dialog(chMeta);
@@ -79,7 +79,7 @@ public class VeCell implements PlugIn {
             }
             
             // Create output folder
-            String outDir = imageDir + File.separator + "Results_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date()) + File.separator;
+            String outDir = imgDir + File.separator + "Results_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date()) + File.separator;
             if (!Files.exists(Paths.get(outDir))) {
                 new File(outDir).mkdir();
             }
@@ -87,16 +87,31 @@ public class VeCell implements PlugIn {
             // Write header in results file
             tools.writeHeaders(outDir, !chOrder[1].equals("None"));
             
+            // If asked in dialog box, normalize vessels channel
+            String normDir = imgDir + File.separator + "Normalization" + File.separator;
+            if (!chOrder[1].equals("None") && !Files.exists(Paths.get(normDir))) {
+                tools.print("--- NORMALIZING IMAGES ---");
+                // Create output folder for normalized files
+                new File(normDir).mkdir();
+                // Save images vessels channel
+                tools.saveChannel(imgFiles, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[1]), normDir, "-vessels.tif");
+                // Normalize images vessels channel
+                new QuantileBasedNormalization().run(normDir, imgFiles, "-vessels");
+                // Delete images vessels channel
+                tools.deleteChannel(normDir, imgFiles, "-vessels.tif");
+                tools.print("Normalization done");
+            }
+            
             IJ.setForegroundColor(255, 255, 255);
             IJ.setBackgroundColor(0, 0, 0);
                  
-            for (String f: imageFiles) {
+            for (String f: imgFiles) {
                 reader.setId(f);
-                String rootName = FilenameUtils.getBaseName(f);
-                tools.print("--- ANALYZING IMAGE " + rootName + " ---");
+                String imgName = FilenameUtils.getBaseName(f);
+                tools.print("--- ANALYZING IMAGE " + imgName + " ---");
                 
                 tools.print("- Loading ROIs -");
-                List<Roi> rawRois = tools.loadRois(imageDir, rootName);
+                List<Roi> rawRois = tools.loadRois(imgDir, imgName);
                 if (rawRois == null) continue;
                 
                 List<Roi> rois = tools.scaleRois(rawRois, tools.roiScaling);
@@ -109,7 +124,8 @@ public class VeCell implements PlugIn {
                 
                  // Astrocytes channel
                 tools.print("- Opening astrocytes channel -");
-                ImagePlus imgCell = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[0]), bBox);
+                ImagePlus imgCell = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[0]));
+                tools.cropImage(imgCell, bBox);
                 
                 tools.print("- Detecting astrocytes -");
                 ImagePlus imgCellMask = tools.cellposeDetection(imgCell);
@@ -118,14 +134,9 @@ public class VeCell implements PlugIn {
                 ImagePlus imgVessel = null, imgVesselMask = null, imgVesselSkel = null;
                 ImageFloat imgVesselDistMap = null, imgVesselDistMapInv = null;
                 if (!chOrder[1].equals("None")){
-                    tools.print("- Opening vessels channels -");
-                    imgVessel = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[1]), bBox);
-                    if (!chOrder[2].equals("None")) {
-                        ImagePlus imgVessel2 = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[2]), bBox);
-                        // Add two vessels channels
-                        new ImageCalculator().run("Add stack", imgVessel, imgVessel2);
-                        tools.closeImage(imgVessel2);
-                    }
+                    tools.print("- Opening vessels channel -");
+                    imgVessel = IJ.openImage(normDir + imgName + "-vessels-normalized.tif");
+                    tools.cropImage(imgVessel, bBox);
                     
                     tools.print("- Detecting vessels -");
                     imgVesselMask = tools.vesselsSegmentation(imgVessel);
@@ -168,10 +179,10 @@ public class VeCell implements PlugIn {
                     tools.drawResultsInRoi(popCellRoi, objVesselRoiDil, objSkelRoi, imhCell, imhCellDist, imhVessel, imhSkel);   
                     
                     tools.print("Writing results...");
-                    tools.writeResultsInRoi(popCellRoi, objSkelRoiDil, objSkelRoi, imgVesselDistMap, imgCell, roi, vesselVolRoi, outDir, rootName);
+                    tools.writeResultsInRoi(popCellRoi, objSkelRoiDil, objSkelRoi, imgVesselDistMap, imgCell, roi, vesselVolRoi, outDir, imgName);
                 }
                 
-                tools.saveCloseDrawings(imgCell, imgVessel, imhCell, imhCellDist, imhVessel, imhSkel, outDir, rootName);
+                tools.saveCloseDrawings(imgCell, imgVessel, imhCell, imhCellDist, imhVessel, imhSkel, outDir, imgName);
                 
                 tools.closeImage(imgCell);
                 tools.closeImage(imgCellMask);
@@ -186,6 +197,8 @@ public class VeCell implements PlugIn {
             tools.closeResults();
             tools.print("--- All done! ---");
         } catch (DependencyException | ServiceException | IOException | FormatException ex) {
+            Logger.getLogger(VeCell.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (Exception ex) {
             Logger.getLogger(VeCell.class.getName()).log(Level.SEVERE, null, ex);
         }
     }

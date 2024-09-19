@@ -87,7 +87,7 @@ public class Tools {
     private Calibration cal;
     private double pixelVol;
     
-    String[] chDialog = new String[]{"Astrocytes", "Vessels 1 (optional)", "Vessels 2 (optional)"};
+    String[] chDialog = new String[]{"Astrocytes", "Vessels (optional)"};
     public int imgSeries = 0;
     public int roiScaling = 9;
     public double roiDilation = 50; // um
@@ -370,6 +370,56 @@ public class Tools {
     }
     
     
+    /**
+     * Save images specific channel before sending it to QuantileBasedNormalization plugin
+     * @throws Exception
+     */
+    public void saveChannel(ArrayList<String> imgFiles, int series, int channel, String normDir, String extension) throws Exception {
+        try {           
+            for (String f : imgFiles) {
+                String imgName = FilenameUtils.getBaseName(f);
+                
+                ImporterOptions options = new ImporterOptions();
+                options.setId(f);
+                options.setSplitChannels(true);
+                options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
+                options.setQuiet(true);
+                
+                // Open and save vessels channel
+                ImagePlus imgVessels = openChannel(options, series, channel);
+                IJ.saveAs(imgVessels, "Tiff", normDir+imgName+extension);
+                closeImage(imgVessels);
+            }
+        } catch (Exception e) {
+            throw e; 
+        }
+    }
+    
+    
+    public ImagePlus openChannel(ImporterOptions options, int series, int channel) throws FormatException, IOException {
+        options.setCBegin(series, channel);
+        options.setCEnd(series, channel);
+        ImagePlus img = BF.openImagePlus(options)[0];
+        return(img);
+    }
+    
+    
+    /**
+     * Delete images specific channel after it was sent to QuantileBasedNormalization plugin
+     * @throws Exception
+     */
+    public void deleteChannel(String dir, ArrayList<String> imageFiles, String extension) throws Exception {
+        try {
+            for (String f : imageFiles) {
+                String rootName = FilenameUtils.getBaseName(f);
+                new File(dir+rootName+extension).delete();
+            }
+        } catch (Exception e) {
+            throw e; 
+        }
+    }
+    
+    
     public List<Roi> loadRois(String imageDir, String rootName) {
         String roiName = imageDir+rootName;
         roiName = new File(roiName+".zip").exists() ? roiName+".zip" : roiName+".roi";
@@ -432,16 +482,10 @@ public class Tools {
     }
     
     
-    public ImagePlus openChannel(ImporterOptions options, int series, int channel, Roi roi) throws FormatException, IOException {
-        options.setCBegin(series, channel);
-        options.setCEnd(series, channel);
-        ImagePlus img = BF.openImagePlus(options)[0];
-        
+    public void cropImage(ImagePlus img, Roi roi) {
         img.setRoi(roi);
         img.crop();
         img.deleteRoi();
-        
-        return(img);
     }
     
     
