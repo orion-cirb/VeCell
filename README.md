@@ -13,7 +13,6 @@
 3 channels:
   1. *DsRed:* Astrocytes (mandatory)
   2. *Cy5:* Vessels 1 (optional)
-  3. *EGFP:* Vessels 2 (optional)
   
 With each image, a *.roi* or *.zip* file containing one or multiple ROIs should be provided; otherwise, the image is not analyzed.
 
@@ -37,12 +36,12 @@ In each ROI:
 
 ### Version history
 
-Version 5 released on September 17, 2024.
+Version 5 released on September 19, 2024.
 
 Improvements compared to version 4:
 * Plugin renamed
 * Code cleaned
 * Dialog box changed
-* Vessels segmentation improved: 2 DoG filters can be applied if thin and thick vessels appear in the image
+* Vessels segmentation improved: channel quantile-based normalization + 2 DoG filters can be applied if thin and thick vessels appear in the image
 * Vessels skeleton branches filtered out by length
 * Vessels skeleton length, branches number, and junctions number provided
