@@ -42,6 +42,8 @@ Improvements compared to version 4:
 * Plugin renamed
 * Code cleaned
 * Dialog box changed
-* Vessels segmentation improved: channel quantile-based normalization + 2 DoG filters can be applied if thin and thick vessels appear in the image
+* Vessels segmentation improved:
+  * Channel quantile-based normalization
+  * 2 DoG filters can be applied if thin and thick vessels appear in the image
 * Vessels skeleton branches filtered out by length
 * Vessels skeleton length, branches number, and junctions number provided
