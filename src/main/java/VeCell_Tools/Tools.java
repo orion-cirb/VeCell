@@ -797,7 +797,7 @@ public class Tools {
         // Cells + vessels
         if (objVessel != null) {
             for (Object3DInt cell: popCell.getObjects3DInt()) {
-                cell.drawObject(imhCellDist, (float)cell.getCompareValue());
+                cell.drawObject(imhCellDist, (float)cell.getCompareValue()+10);
             }
             objVessel.drawObject(imhVessel, 255);
             objSkel.drawObject(imhSkel, 255);
