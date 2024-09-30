@@ -930,13 +930,18 @@ public class Tools {
                             cellsNeighborsMaxDist.getMean()+"\t"+cellsNeighborsMaxDist.getStandardDeviation());
         
         if (computeGFunction) {
-            System.out.println("Computing G-function-related spatial distribution index...");
-            Object3DInt mask = roiMask(imgCell, roi);
-            double minDist = Math.pow(3*minCellVol/(4*Math.PI*pixelVol), 1/3) * 2; // min distance = 2 * min cell radius (in pixels)
-            String plotName = outDir + imgName + "_" + roi.getName() + "_gfunction.tif";
-            double[] res = computeSdiG(popCellRoi, mask, imgCell, minDist, nbRandomSamples, plotName);
-            resultsGlobal.write("\t"+res[0]+"\t"+res[1]);
-            resultsGlobal.flush();
+            if(popCellRoi.getNbObjects() <= 1) {
+                resultsGlobal.write("\t"+Double.NaN+"\t"+Double.NaN);
+                resultsGlobal.flush();
+            } else {
+                System.out.println("Computing G-function-related spatial distribution index...");
+                Object3DInt mask = roiMask(imgCell, roi);
+                double minDist = Math.pow(3*minCellVol/(4*Math.PI*pixelVol), 1/3) * 2; // min distance = 2 * min cell radius (in pixels)
+                String plotName = outDir + imgName + "_" + roi.getName() + "_gfunction.tif";
+                double[] res = computeSdiG(popCellRoi, mask, imgCell, minDist, nbRandomSamples, plotName);
+                resultsGlobal.write("\t"+res[0]+"\t"+res[1]);
+                resultsGlobal.flush();
+            }
         }
         
         // VESSELS STATISTICS
