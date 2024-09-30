@@ -884,29 +884,38 @@ public class Tools {
         MeasurePopulationDistance allCellsDists = new MeasurePopulationDistance​(popCellRoi, popCellRoi, Double.POSITIVE_INFINITY, "DistCenterCenterUnit");
         for (Object3DInt cell: popCellRoi.getObjects3DInt()) {
             double cellVol = new MeasureVolume(cell).getVolumeUnit();
-            cellsVolume.addValue(cellVol);
+            cellsVolume.addValue(cellVol);            
+            resultsDetail.write(imgName+"\t"+roi.getName()+"\t"+cell.getLabel()+"\t"+cellVol);
+            resultsDetail.flush();
+            
+            if(popCellRoi.getNbObjects() == 1) {
+                resultsDetail.write("\t"+Double.NaN+"\t"+Double.NaN+"\t"+Double.NaN);
+                resultsDetail.flush();
+            } else {
+                List<PairObjects3DInt> cellCellsDists = allCellsDists.getPairsObject1(cell.getLabel(), true);
+                double closestNeighborDist = cellCellsDists.get(1).getPairValue();
+                cellsClosestNeighborDist.addValue(closestNeighborDist);
+
+                DescriptiveStatistics cellNeighborsDists = new DescriptiveStatistics();
+                for (int d=1; d <= Math.min(nbNei, popCellRoi.getNbObjects()-1); d++)
+                    cellNeighborsDists.addValue(cellCellsDists.get(d).getPairValue());
+
+                double closestNeighborsMeanDist = cellNeighborsDists.getMean();
+                cellsNeighborsMeanDist.addValue(closestNeighborsMeanDist);
+                double closestNeighborsMaxDist = cellNeighborsDists.getMax();
+                cellsNeighborsMaxDist.addValue(closestNeighborsMaxDist);
+
+                resultsDetail.write("\t"+closestNeighborDist+"\t"+closestNeighborsMeanDist+"\t"+closestNeighborsMaxDist);
+                resultsDetail.flush();
+            }
             
             cellsClosestVesselDist.addValue(cell.getCompareValue());
-            
-            List<PairObjects3DInt> cellCellsDists = allCellsDists.getPairsObject1(cell.getLabel(), true);
-            double closestNeighborDist = cellCellsDists.get(1).getPairValue();
-            cellsClosestNeighborDist.addValue(closestNeighborDist);
-            
-            DescriptiveStatistics cellNeighborsDists = new DescriptiveStatistics();
-            for (int d=1; d <= Math.min(nbNei, popCellRoi.getNbObjects()-1); d++)
-                cellNeighborsDists.addValue(cellCellsDists.get(d).getPairValue());
-            
-            double closestNeighborsMeanDist = cellNeighborsDists.getMean();
-            cellsNeighborsMeanDist.addValue(closestNeighborsMeanDist);
-            double closestNeighborsMaxDist = cellNeighborsDists.getMax();
-            cellsNeighborsMaxDist.addValue(closestNeighborsMaxDist);
-           
-            resultsDetail.write(imgName+"\t"+roi.getName()+"\t"+cell.getLabel()+"\t"+cellVol+"\t"+closestNeighborDist+"\t"+
-                        closestNeighborsMeanDist+"\t"+closestNeighborsMaxDist);
             if (objSkelRoiDil != null) {
                 double diam = 2*distMap.getPixel(new Measure2Distance(cell, objSkelRoiDil).getBorder2Pix());
-                resultsDetail.write("\t"+cell.getCompareValue()+"\t"+diam); 
+                resultsDetail.write("\t"+cell.getCompareValue()+"\t"+diam);
+                resultsDetail.flush();
             }
+            
             resultsDetail.write("\n");
             resultsDetail.flush();
         }
@@ -927,6 +936,7 @@ public class Tools {
             String plotName = outDir + imgName + "_" + roi.getName() + "_gfunction.tif";
             double[] res = computeSdiG(popCellRoi, mask, imgCell, minDist, nbRandomSamples, plotName);
             resultsGlobal.write("\t"+res[0]+"\t"+res[1]);
+            resultsGlobal.flush();
         }
         
         // VESSELS STATISTICS
