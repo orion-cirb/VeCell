@@ -12,7 +12,7 @@
 
 3 channels:
   1. *DsRed:* Astrocytes (mandatory)
-  2. *Cy5:* Vessels 1 (optional)
+  2. *Cy5:* Vessels (optional)
   
 With each image, a *.roi* or *.zip* file containing one or multiple ROIs should be provided; otherwise, the image is not analyzed.
 
