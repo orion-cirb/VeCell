@@ -2,7 +2,7 @@
 
 * **Developed for:** Naomie
 * **Team:** Cohen-Salmon
-* **Date:** September 2024
+* **Date:** October 2024
 * **Software:** Fiji
 
 
@@ -36,7 +36,7 @@ In each ROI:
 
 ### Version history
 
-Version 5 released on September 19, 2024.
+Version 5 released on October 23, 2024.
 
 Improvements compared to version 4:
 * Plugin renamed
