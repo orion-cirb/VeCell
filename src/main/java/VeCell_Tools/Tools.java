@@ -482,10 +482,31 @@ public class Tools {
     }
     
     
-    public void cropImage(ImagePlus img, Roi roi) {
+    /**
+     * Save ROIs in a zip file
+     */
+    public void saveRois(List<Roi> rois, String outDir, String imgName) {
+        RoiManager rm = new RoiManager(false);
+        for(Roi roi: rois) {
+            String layerName = roi.getName().split(" ")[1];
+            rm.addRoi(roi);
+            String roiName = rm.getName(rm.getCount()-1) + " " + layerName;
+            rm.rename(rm.getCount()-1, roiName);
+        }
+        rm.deselect();
+        rm.save(outDir+imgName+"_rois.zip");
+        rm.close();
+    }
+    
+    
+    /**
+     * Crop stack around ROI
+     */
+    public ImagePlus cropImage(ImagePlus img, Roi roi) {
         img.setRoi(roi);
-        img.crop();
+        ImagePlus imgCrop = img.crop("stack");
         img.deleteRoi();
+        return(imgCrop);
     }
     
     

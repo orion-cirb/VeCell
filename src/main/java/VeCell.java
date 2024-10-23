@@ -125,7 +125,7 @@ public class VeCell implements PlugIn {
                  // Astrocytes channel
                 tools.print("- Opening astrocytes channel -");
                 ImagePlus imgCell = tools.openChannel(options, tools.imgSeries, ArrayUtils.indexOf(chMeta, chOrder[0]));
-                tools.cropImage(imgCell, bBox);
+                imgCell = tools.cropImage(imgCell, bBox);
                 
                 tools.print("- Detecting astrocytes -");
                 ImagePlus imgCellMask = tools.cellposeDetection(imgCell);
@@ -136,7 +136,7 @@ public class VeCell implements PlugIn {
                 if (!chOrder[1].equals("None")){
                     tools.print("- Opening vessels channel -");
                     imgVessel = IJ.openImage(normDir + imgName + "-vessels-normalized.tif");
-                    tools.cropImage(imgVessel, bBox);
+                    imgVessel = tools.cropImage(imgVessel, bBox);
                     
                     tools.print("- Detecting vessels -");
                     imgVesselMask = tools.vesselsSegmentation(imgVessel);
@@ -183,6 +183,7 @@ public class VeCell implements PlugIn {
                 }
                 
                 tools.saveCloseDrawings(imgCell, imgVessel, imhCell, imhCellDist, imhVessel, imhSkel, outDir, imgName);
+                tools.saveRois(rois, outDir, imgName);
                 
                 tools.closeImage(imgCell);
                 tools.closeImage(imgCellMask);
