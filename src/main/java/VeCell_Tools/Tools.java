@@ -17,6 +17,7 @@ import ij.plugin.RGBStackMerge;
 import ij.plugin.RoiEnlarger;
 import ij.plugin.RoiScaler;
 import ij.plugin.filter.Analyzer;
+import ij.plugin.filter.ParticleAnalyzer;
 import ij.plugin.frame.RoiManager;
 import ij.process.AutoThresholder;
 import java.awt.Color;
@@ -111,6 +112,7 @@ public class Tools {
     private double dog2Sigma1 = 7;
     private double dog2Sigma2 = 14;
     private String vesselThMet2 = "Triangle";
+    private double maxHoleArea = 100; // µm2
     public double minVesselVol = 600; // um3
     private double minVesselLength = 10; // um
     
@@ -319,6 +321,7 @@ public class Tools {
         gd.addToSameRow();
         gd.addNumericField("Sigma 2: ", dog2Sigma2, 2);
         gd.addChoice("Threshold: ", methods, vesselThMet2);
+        gd.addNumericField("Max hole area (µm2): ", maxHoleArea, 2);
         gd.addNumericField("Min volume (µm3): ", minVesselVol, 2);
         gd.addToSameRow();
         gd.addNumericField("Min length (µm): ", minVesselLength, 2);
@@ -357,6 +360,7 @@ public class Tools {
         dog2Sigma1 = (int) gd.getNextNumber();
         dog2Sigma2 = (int) gd.getNextNumber();
         vesselThMet2 = gd.getNextChoice();
+        maxHoleArea = gd.getNextNumber();
         minVesselVol = gd.getNextNumber();
         minVesselLength = gd.getNextNumber();
         
@@ -420,17 +424,23 @@ public class Tools {
     }
     
     
-    public List<Roi> loadRois(String imageDir, String rootName) {
-        String roiName = imageDir+rootName;
-        roiName = new File(roiName+".zip").exists() ? roiName+".zip" : roiName+".roi";
-        if (new File(roiName).exists()) {
+    public List<Roi> loadRois(String imageDir, String imgName) {
+        String roiName = imageDir+imgName+".zip";
+        if (! new File(roiName).exists()) {
+            print("ERROR: No ROI file found for image "+imgName+". Image not analyzed.");
+            return(null);
+        } else {
             RoiManager rm = new RoiManager(false);
             rm.runCommand("Open", roiName);
             List<Roi> rois = Arrays.asList(rm.getRoisAsArray());
+            
+            for (Roi roi : rois) {
+                if(roi.getName().split(" ").length != 2) {
+                    print("ERROR: ROIs not correctly named in "+imgName +". Image not analyzed. Expected format: \"position layerName\" (e.g. \"0095-0429 l2\").");
+                    return(null);
+                }
+            }
             return(rois);
-        } else {
-            print("ERROR: No ROI file found for image " + rootName + ", image not analyzed");
-            return(null);
         }
     }
         
@@ -438,7 +448,7 @@ public class Tools {
     /**
      * Scale ROIs
      */
-    public List<Roi> scaleRois(List<Roi> rois, int scale) {
+    public List<Roi> scaleRois(List<Roi> rois, int scale, IMetadata meta, String imgName) {
         List<Roi> scaledRois = new ArrayList<Roi>();
         for (Roi roi : rois) {
             Roi scaledRoi = new RoiScaler().scale(roi, scale, scale, false);
@@ -446,6 +456,14 @@ public class Tools {
             scaledRoi.setLocation(rect.x*scale, rect.y*scale);
             scaledRoi.setName(roi.getName());
             scaledRois.add(scaledRoi);
+        }
+        
+        for (Roi roi : scaledRois) {
+            Rectangle rect = roi.getBounds();
+            if(rect.x < 0 || rect.x < 0 || rect.x+rect.width > meta.getPixelsSizeX(0).getValue() || rect.y+rect.height > meta.getPixelsSizeY(0).getValue()) {
+                print("ERROR: ROIs exceed image size in "+imgName +". Image not analyzed. Check scaling factor.");
+                return(null);
+            }
         }
         return scaledRois;
     }
@@ -550,7 +568,8 @@ public class Tools {
             closeImage(imgBin2);
         }
         ImagePlus imgClose = closingFilter3D(imgBin, 8, 1);
-        ImagePlus imgOut = medianFilter3D(imgClose, 1, 1);
+        ImagePlus imgMed2 = medianFilter3D(imgClose, 1, 1);
+        ImagePlus imgOut = fillHoles2D(imgMed2, 0, maxHoleArea);
 
         ImageInt imgLabels = new ImageLabeller().getLabels(ImageHandler.wrap(imgOut));
         imgLabels.setCalibration(cal);
@@ -570,6 +589,7 @@ public class Tools {
         closeImage(imgDOG);
         closeImage(imgBin);
         closeImage(imgClose);
+        closeImage(imgMed2);
         closeImage(imgOut);
         closeImage(imgLabels.getImagePlus());
         
@@ -635,6 +655,44 @@ public class Tools {
        clij2.release(imgCLMax);
        clij2.release(imgCLMin);
        return(imgMin);
+    }
+    
+    
+    /**
+     * Fill holes with areas between the specified min and max values
+     */ 
+    private ImagePlus fillHoles2D(ImagePlus img, double minArea, double maxArea) {
+        ImagePlus imgFill = img.duplicate();
+
+        // Invert image to detect background holes
+        IJ.setRawThreshold(imgFill, 1, 255);
+        IJ.run(imgFill, "Convert to Mask", "background=Dark black");
+        IJ.run(imgFill, "Invert", "stack");
+        
+        // Analyze particles to detect holes within the specified area range
+        double pixArea = cal.pixelWidth*cal.pixelHeight;
+        ParticleAnalyzer pa = new ParticleAnalyzer(ParticleAnalyzer.ADD_TO_MANAGER, 0, new ResultsTable(), minArea/pixArea, maxArea/pixArea); // In pixels^2
+        RoiManager rm = new RoiManager(true);
+        pa.setRoiManager(rm);
+        
+        for (int s = 1; s <= imgFill.getNSlices(); s++) {
+            imgFill.setSlice(s);
+            pa.analyze(imgFill);
+            
+            // Reinvert image before filling holes
+            IJ.run(imgFill, "Invert", "slice");
+            
+            // Fill the detected holes
+            for (int i = 0; i < rm.getCount(); i++) {
+                imgFill.setRoi(rm.getRoi(i));
+                imgFill.setColor(Color.white);
+                IJ.run(imgFill, "Fill", "slice");
+            }
+            imgFill.deleteRoi();
+            rm.reset();
+        }
+        
+        return(imgFill);
     }
     
     
@@ -710,6 +768,7 @@ public class Tools {
             }
         }
         
+        prunedImage = skeletonize3D(prunedImage);
         return(prunedImage);
     }
     
@@ -746,7 +805,6 @@ public class Tools {
 
         // Filter detections
         Objects3DIntPopulation pop = new Objects3DIntPopulation(ImageInt.wrap(imgClear));
-        popFilterOneZ(pop);
         popFilterCentroid(pop, roi);
         System.out.println(pop.getNbObjects() + " cells detected in ROI");
         popFilterVol(pop, minCellVol, maxCellVol);

@@ -106,7 +106,7 @@ public class VeCell implements PlugIn {
             IJ.setBackgroundColor(0, 0, 0);
                  
             for (String f: imgFiles) {
-                reader.setId(f);
+                reader.setId(f);                
                 String imgName = FilenameUtils.getBaseName(f);
                 tools.print("--- ANALYZING IMAGE " + imgName + " ---");
                 
@@ -114,7 +114,8 @@ public class VeCell implements PlugIn {
                 List<Roi> rawRois = tools.loadRois(imgDir, imgName);
                 if (rawRois == null) continue;
                 
-                List<Roi> rois = tools.scaleRois(rawRois, tools.roiScaling);
+                List<Roi> rois = tools.scaleRois(rawRois, tools.roiScaling, meta, imgName);
+                if (rois == null) continue;
                 Roi bBox = tools.getBoundingBox(rois);
                 tools.translateRois(rois, bBox);
                 
@@ -151,7 +152,7 @@ public class VeCell implements PlugIn {
                     imgVesselSkel = tools.pruneSkeleton(imgVesselSkel);
                 }
                 
-                // For each roi, open cropped image
+                // For each roi, analyze and save parameters
                 ImageHandler imhCell = ImageHandler.wrap(imgCell).createSameDimensions();
                 ImageHandler imhCellDist = imhCell.createSameDimensions();
                 ImageHandler imhVessel = imhCell.createSameDimensions();

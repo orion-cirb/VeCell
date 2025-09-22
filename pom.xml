@@ -13,7 +13,7 @@
         
     <groupId>fr.cirb.orion</groupId>
     <artifactId>VeCell</artifactId>
-    <version>5.0.0</version>
+    <version>5.1.0</version>
     <packaging>jar</packaging>
     
     <name>VeCell</name>
@@ -23,7 +23,7 @@
             - Compute distance between each cell and its neighbors
             - Compute G-function related spatial distribution index of the population of cells
             - If vessels channel provided: 
-                - Detect vessels with median filtering + DoG filtering + thresholding + closing filtering + median filtering
+                - Detect vessels with median filtering + DoG filtering + thresholding + closing filtering + holes filling + median filtering
                 - Compute vessels skeleton and provide vessels diameter, length, branches number, and junctions number
                 - Compute distance between each cell and its nearest vessel
     </description>
