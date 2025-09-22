@@ -98,6 +98,7 @@ public class Tools {
     public String cellposeModel = "cyto2_sox9_p5-15-60_27-11-24";
     public int cellposeDiam = 20;
     public double cellposeStitchTh = 0.5;
+    public boolean filterOneZ = true;
     public double minCellVol = 300; // um3
     public double maxCellVol = 3000; // um3
     
@@ -298,6 +299,7 @@ public class Tools {
         gd.addStringField("Cellpose model: ", cellposeModel);
         gd.addToSameRow();
         gd.addNumericField("Cellpose diameter: ", cellposeDiam, 0);
+        gd.addCheckbox("Delete single-slice cells", filterOneZ);
         gd.addNumericField("Min volume (µm3): ", minCellVol, 2);
         gd.addToSameRow();
         gd.addNumericField("Max volume (µm3): ", maxCellVol, 2);
@@ -341,11 +343,12 @@ public class Tools {
         roiScaling = (int) gd.getNextNumber();
         if (roiScaling <= 0) {
             roiScaling = 1;
-            print("WARNING: ROIs cannot be scaled by zero or negative values, ROI scaling factor set to 1");
+            print("ERROR: ROIs cannot be scaled by zero or negative values. ROI scaling factor set to 1.");
         }
         
         cellposeModel = gd.getNextString();
         cellposeDiam = (int) gd.getNextNumber();
+        filterOneZ = gd.getNextBoolean();
         minCellVol = gd.getNextNumber();
         maxCellVol = gd.getNextNumber();
         
@@ -805,6 +808,7 @@ public class Tools {
 
         // Filter detections
         Objects3DIntPopulation pop = new Objects3DIntPopulation(ImageInt.wrap(imgClear));
+        if(filterOneZ) popFilterOneZ(pop);
         popFilterCentroid(pop, roi);
         System.out.println(pop.getNbObjects() + " cells detected in ROI");
         popFilterVol(pop, minCellVol, maxCellVol);
