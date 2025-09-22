@@ -1,0 +1,78 @@
+(cellpose) heloise@heloise-Precision-7920-Tower:~/Images/Cohen-Salmon/Naomie/cellpose_training$ cellpose --train --pretrained_model cyto2 --dir training_set/ --test_dir validation_set/ --mask_filter _seg.npy --learning_rate 0.1 --weight_decay 0.0001 --n_epochs 500 --verbose --use_gpu
+2024-11-27 19:51:34,525 [INFO] WRITING LOG OUTPUT TO /home/heloise/.cellpose/run.log
+2024-11-27 19:51:34,650 [INFO] ** TORCH CUDA version installed and working. **
+2024-11-27 19:51:34,650 [INFO] >>>> using GPU
+2024-11-27 19:51:35,344 [INFO] 28 / 28 images in training_set/ folder have labels
+2024-11-27 19:51:35,621 [INFO] 8 / 8 images in validation_set/ folder have labels
+2024-11-27 19:51:35,621 [INFO] >>>> during training rescaling images to fixed diameter of 30.0 pixels
+2024-11-27 19:51:35,621 [INFO] >> cyto2 << model set to be used
+2024-11-27 19:51:36,158 [INFO] >>>> model diam_mean =  30.000 (ROIs rescaled to this size during training)
+2024-11-27 19:51:38,976 [INFO] computing flows for labels
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 28/28 [00:01<00:00, 14.20it/s]
+2024-11-27 19:51:43,704 [INFO] computing flows for labels
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████| 8/8 [00:00<00:00,  9.88it/s]
+2024-11-27 19:51:48,589 [INFO] >>>> median diameter set to = 30
+2024-11-27 19:51:48,590 [INFO] >>>> mean of training label mask diameters (saved to model) 21.307
+2024-11-27 19:51:48,591 [INFO] >>>> training network with 2 channel input <<<<
+2024-11-27 19:51:48,594 [INFO] >>>> LR: 0.10000, batch_size: 8, weight_decay: 0.00010
+2024-11-27 19:51:48,594 [INFO] >>>> ntrain = 28, ntest = 8
+2024-11-27 19:51:48,594 [INFO] >>>> nimg_per_epoch = 28
+2024-11-27 19:51:50,751 [INFO] Epoch 0, Time  2.2s, Loss 1.3095, Loss Test 0.1975, LR 0.0000
+2024-11-27 19:51:51,667 [INFO] saving network parameters to /home/heloise/Images/Cohen-Salmon/Naomie/cellpose_training/training_set/models/cellpose_residual_on_style_on_concatenation_off_training_set_2024_11_27_19_51_46.769714
+2024-11-27 19:51:55,876 [INFO] Epoch 5, Time  7.3s, Loss 0.2333, Loss Test 0.3926, LR 0.0556
+2024-11-27 19:52:01,295 [INFO] Epoch 10, Time 12.7s, Loss 0.1233, Loss Test 0.0602, LR 0.1000
+2024-11-27 19:52:10,147 [INFO] Epoch 20, Time 21.6s, Loss 0.0824, Loss Test 0.0453, LR 0.1000
+2024-11-27 19:52:17,339 [INFO] Epoch 30, Time 28.7s, Loss 0.0703, Loss Test 0.0424, LR 0.1000
+2024-11-27 19:52:24,211 [INFO] Epoch 40, Time 35.6s, Loss 0.0649, Loss Test 0.0401, LR 0.1000
+2024-11-27 19:52:31,216 [INFO] Epoch 50, Time 42.6s, Loss 0.0694, Loss Test 0.0379, LR 0.1000
+2024-11-27 19:52:38,242 [INFO] Epoch 60, Time 49.6s, Loss 0.0644, Loss Test 0.0345, LR 0.1000
+2024-11-27 19:52:45,138 [INFO] Epoch 70, Time 56.5s, Loss 0.0547, Loss Test 0.0345, LR 0.1000
+2024-11-27 19:52:52,728 [INFO] Epoch 80, Time 64.1s, Loss 0.0579, Loss Test 0.0375, LR 0.1000
+2024-11-27 19:53:00,101 [INFO] Epoch 90, Time 71.5s, Loss 0.0529, Loss Test 0.0376, LR 0.1000
+2024-11-27 19:53:07,487 [INFO] Epoch 100, Time 78.9s, Loss 0.0588, Loss Test 0.0361, LR 0.1000
+2024-11-27 19:53:08,297 [INFO] saving network parameters to /home/heloise/Images/Cohen-Salmon/Naomie/cellpose_training/training_set/models/cellpose_residual_on_style_on_concatenation_off_training_set_2024_11_27_19_51_46.769714
+2024-11-27 19:53:15,265 [INFO] Epoch 110, Time 86.7s, Loss 0.0536, Loss Test 0.0346, LR 0.1000
+2024-11-27 19:53:22,068 [INFO] Epoch 120, Time 93.5s, Loss 0.0555, Loss Test 0.0332, LR 0.1000
+2024-11-27 19:53:29,535 [INFO] Epoch 130, Time 100.9s, Loss 0.0592, Loss Test 0.0313, LR 0.1000
+2024-11-27 19:53:36,626 [INFO] Epoch 140, Time 108.0s, Loss 0.0525, Loss Test 0.0334, LR 0.1000
+2024-11-27 19:53:43,980 [INFO] Epoch 150, Time 115.4s, Loss 0.0546, Loss Test 0.0340, LR 0.1000
+2024-11-27 19:53:51,692 [INFO] Epoch 160, Time 123.1s, Loss 0.0528, Loss Test 0.0333, LR 0.1000
+2024-11-27 19:53:59,533 [INFO] Epoch 170, Time 130.9s, Loss 0.0525, Loss Test 0.0345, LR 0.1000
+2024-11-27 19:54:06,958 [INFO] Epoch 180, Time 138.4s, Loss 0.0551, Loss Test 0.0328, LR 0.1000
+2024-11-27 19:54:14,035 [INFO] Epoch 190, Time 145.4s, Loss 0.0577, Loss Test 0.0360, LR 0.1000
+2024-11-27 19:54:21,230 [INFO] Epoch 200, Time 152.6s, Loss 0.0491, Loss Test 0.0304, LR 0.1000
+2024-11-27 19:54:21,914 [INFO] saving network parameters to /home/heloise/Images/Cohen-Salmon/Naomie/cellpose_training/training_set/models/cellpose_residual_on_style_on_concatenation_off_training_set_2024_11_27_19_51_46.769714
+2024-11-27 19:54:28,457 [INFO] Epoch 210, Time 159.9s, Loss 0.0550, Loss Test 0.0348, LR 0.1000
+2024-11-27 19:54:35,385 [INFO] Epoch 220, Time 166.8s, Loss 0.0497, Loss Test 0.0340, LR 0.1000
+2024-11-27 19:54:42,055 [INFO] Epoch 230, Time 173.5s, Loss 0.0460, Loss Test 0.0301, LR 0.1000
+2024-11-27 19:54:48,813 [INFO] Epoch 240, Time 180.2s, Loss 0.0511, Loss Test 0.0345, LR 0.1000
+2024-11-27 19:54:55,663 [INFO] Epoch 250, Time 187.1s, Loss 0.0516, Loss Test 0.0337, LR 0.1000
+2024-11-27 19:55:02,572 [INFO] Epoch 260, Time 194.0s, Loss 0.0435, Loss Test 0.0358, LR 0.1000
+2024-11-27 19:55:09,234 [INFO] Epoch 270, Time 200.6s, Loss 0.0527, Loss Test 0.0344, LR 0.1000
+2024-11-27 19:55:16,015 [INFO] Epoch 280, Time 207.4s, Loss 0.0541, Loss Test 0.0393, LR 0.1000
+2024-11-27 19:55:22,686 [INFO] Epoch 290, Time 214.1s, Loss 0.0424, Loss Test 0.0353, LR 0.1000
+2024-11-27 19:55:29,381 [INFO] Epoch 300, Time 220.8s, Loss 0.0467, Loss Test 0.0349, LR 0.1000
+2024-11-27 19:55:30,066 [INFO] saving network parameters to /home/heloise/Images/Cohen-Salmon/Naomie/cellpose_training/training_set/models/cellpose_residual_on_style_on_concatenation_off_training_set_2024_11_27_19_51_46.769714
+2024-11-27 19:55:36,367 [INFO] Epoch 310, Time 227.8s, Loss 0.0517, Loss Test 0.0368, LR 0.1000
+2024-11-27 19:55:43,084 [INFO] Epoch 320, Time 234.5s, Loss 0.0495, Loss Test 0.0371, LR 0.1000
+2024-11-27 19:55:50,919 [INFO] Epoch 330, Time 242.3s, Loss 0.0471, Loss Test 0.0373, LR 0.1000
+2024-11-27 19:55:59,926 [INFO] Epoch 340, Time 251.3s, Loss 0.0449, Loss Test 0.0355, LR 0.1000
+2024-11-27 19:56:09,372 [INFO] Epoch 350, Time 260.8s, Loss 0.0504, Loss Test 0.0356, LR 0.1000
+2024-11-27 19:56:16,314 [INFO] Epoch 360, Time 267.7s, Loss 0.0478, Loss Test 0.0342, LR 0.1000
+2024-11-27 19:56:23,058 [INFO] Epoch 370, Time 274.5s, Loss 0.0489, Loss Test 0.0376, LR 0.1000
+2024-11-27 19:56:30,068 [INFO] Epoch 380, Time 281.5s, Loss 0.0478, Loss Test 0.0345, LR 0.1000
+2024-11-27 19:56:37,466 [INFO] Epoch 390, Time 288.9s, Loss 0.0469, Loss Test 0.0340, LR 0.1000
+2024-11-27 19:56:44,609 [INFO] Epoch 400, Time 296.0s, Loss 0.0482, Loss Test 0.0331, LR 0.1000
+2024-11-27 19:56:45,272 [INFO] saving network parameters to /home/heloise/Images/Cohen-Salmon/Naomie/cellpose_training/training_set/models/cellpose_residual_on_style_on_concatenation_off_training_set_2024_11_27_19_51_46.769714
+2024-11-27 19:56:51,852 [INFO] Epoch 410, Time 303.3s, Loss 0.0451, Loss Test 0.0303, LR 0.0500
+2024-11-27 19:56:58,658 [INFO] Epoch 420, Time 310.1s, Loss 0.0480, Loss Test 0.0334, LR 0.0250
+2024-11-27 19:57:05,381 [INFO] Epoch 430, Time 316.8s, Loss 0.0462, Loss Test 0.0327, LR 0.0125
+2024-11-27 19:57:12,281 [INFO] Epoch 440, Time 323.7s, Loss 0.0450, Loss Test 0.0332, LR 0.0063
+2024-11-27 19:57:19,074 [INFO] Epoch 450, Time 330.5s, Loss 0.0437, Loss Test 0.0340, LR 0.0031
+2024-11-27 19:57:25,787 [INFO] Epoch 460, Time 337.2s, Loss 0.0462, Loss Test 0.0345, LR 0.0016
+2024-11-27 19:57:32,625 [INFO] Epoch 470, Time 344.0s, Loss 0.0485, Loss Test 0.0338, LR 0.0008
+2024-11-27 19:57:39,437 [INFO] Epoch 480, Time 350.8s, Loss 0.0427, Loss Test 0.0335, LR 0.0004
+2024-11-27 19:57:46,347 [INFO] Epoch 490, Time 357.8s, Loss 0.0466, Loss Test 0.0325, LR 0.0002
+2024-11-27 19:57:52,863 [INFO] saving network parameters to /home/heloise/Images/Cohen-Salmon/Naomie/cellpose_training/training_set/models/cellpose_residual_on_style_on_concatenation_off_training_set_2024_11_27_19_51_46.769714
+2024-11-27 19:57:53,016 [INFO] >>>> model trained and saved to /home/heloise/Images/Cohen-Salmon/Naomie/cellpose_training/training_set/models/cellpose_residual_on_style_on_concatenation_off_training_set_2024_11_27_19_51_46.769714
+
