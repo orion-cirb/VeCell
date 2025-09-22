@@ -34,7 +34,11 @@ In each ROI:
 
 * **3DImageSuite** Fiji plugin
 * **CLIJ2** Fiji plugin
-* **Cellpose** conda environment + `cyto` pretrained model or another fine-tuned model
+* **Cellpose** conda environment + fine-tuned model `cyto2_sox9_p5-15-60_27-11-24`
+  
+The Fiji plugins, Cellpose environment, and associated model are installed on the workstations in the ORION image analysis room.
+
+The dataset used for Cellpose model fine-tuning is stored in the ORION storage space on the ISIS_PROD_NAS server.
 
 ### Version history
 
