@@ -9,7 +9,7 @@
 ### Images description
 
 3D images taken on an Axio Zoom microscope with Apotome module:
-* Objective: 2.3x 
+* Zoom: 160x 
 * File format: .czi 
 * Voxel size: 0.4063 µm (XY), 4.00 µm (Z)
 
